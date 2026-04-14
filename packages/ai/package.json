@@ -1,0 +1,11 @@
+{
+  "name": "@nexus/ai",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "dependencies": {
+    "groq-sdk": "^0.3.0",
+    "@supabase/supabase-js": "^2.39.7"
+  }
+}
