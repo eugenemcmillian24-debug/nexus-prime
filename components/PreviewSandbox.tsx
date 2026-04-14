@@ -3,7 +3,8 @@
 import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackThemeProp } from "@codesandbox/sandpack-react";
 import { BuildResult } from "@/lib/export";
 
-const NEXUS_PRIME_THEME: SandpackThemeProp = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const NEXUS_PRIME_THEME: any = {
   colors: {
     surface1: "#050505",
     surface2: "#0a0a0a",
@@ -65,7 +66,7 @@ export default function App() {
     <div className="h-full w-full bg-[#050505] animate-in fade-in duration-700">
       <SandpackProvider
         template="nextjs"
-        theme={NEXUS_PRIME_THEME}
+        theme={NEXUS_PRIME_THEME as SandpackThemeProp}
         files={files}
         options={{
           recompileMode: "immediate",

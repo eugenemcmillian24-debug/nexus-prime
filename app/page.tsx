@@ -7,7 +7,7 @@ import CodePreview from "@/components/CodePreview";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import ScreenshotUpload from "@/components/ScreenshotUpload";
 import Login from "@/components/Login";
-import { createClient, User } from "@supabase/supabase-js";
+import { createClient, User, AuthChangeEvent, Session, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { NEXUS_TEMPLATES } from "@/lib/templates";
 import * as Icons from "lucide-react";
 
@@ -40,7 +40,7 @@ export default function Page() {
     checkUser();
 
     // 2. Auth State Listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
     });
 
@@ -63,7 +63,7 @@ export default function Page() {
     // 4. Realtime Credits Subscription
     const channel = supabase
       .channel(`credits-${user.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_credits', filter: `user_id=eq.${user.id}` }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_credits', filter: `user_id=eq.${user.id}` }, (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
         setCredits(payload.new);
       })
       .subscribe();
@@ -86,9 +86,9 @@ export default function Page() {
           table: "agent_jobs",
           filter: `id=eq.${jobId}`,
         },
-        (payload) => {
-          if (payload.new.status === "completed") {
-            setJobResult(payload.new.result);
+        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+          if ((payload.new as Record<string, unknown>).status === "completed") {
+            setJobResult((payload.new as Record<string, unknown>).result);
           }
         }
       )

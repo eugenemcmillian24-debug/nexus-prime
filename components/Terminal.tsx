@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
@@ -36,7 +36,7 @@ export default function Terminal({ jobId }: { jobId: string }) {
           table: "agent_events",
           filter: `job_id=eq.${jobId}`,
         },
-        (payload) => {
+        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
           setEvents((prev) => [...prev, payload.new]);
         }
       )
