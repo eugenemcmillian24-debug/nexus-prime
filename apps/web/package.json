@@ -19,6 +19,7 @@
     "file-saver": "^2.0.5",
     "zod": "^3.22.4",
     "@codesandbox/sandpack-react": "^2.13.4",
+    "@nexus/ai": "*",
     "clsx": "^2.1.0",
     "tailwind-merge": "^2.2.1"
   },
