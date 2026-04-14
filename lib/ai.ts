@@ -88,8 +88,8 @@ export class NexusOrchestrator {
       await this.logEvent(jobId, 'deepseek-r1-distill', 'completion', reasoning);
 
       // STEP 2: ORCHESTRATION (Llama-70B)
-      await this.logEvent(jobId, 'llama-3.1-70b-versatile', 'thought', 'Generating execution plan based on reasoning...');
-      const plan = await this.callGroq('llama-3.1-70b-versatile', [
+      await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'thought', 'Generating execution plan based on reasoning...');
+      const plan = await this.callGroq('llama-3.3-70b-versatile', [
         { role: 'system', content: 'You are the Orchestrator. Create a task list for the Coder agent.' },
         { role: 'user', content: `Reasoning: ${reasoning}\nPrompt: ${job.prompt}` }
       ]);
@@ -111,8 +111,8 @@ export class NexusOrchestrator {
       }
 
       // STEP 4: LINTING (Llama-70B) - QUALITY ASSURANCE
-      await this.logEvent(jobId, 'llama-3.1-70b-versatile', 'thought', 'Reviewing code for syntax and type safety...');
-      const linterResponse = await this.callGroq('llama-3.1-70b-versatile', [
+      await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'thought', 'Reviewing code for syntax and type safety...');
+      const linterResponse = await this.callGroq('llama-3.3-70b-versatile', [
         { role: 'system', content: LINTER_SYSTEM_PROMPT },
         { role: 'user', content: `Initial Code: ${JSON.stringify(initialCode)}\nPlan: ${plan}` }
       ]);
@@ -124,7 +124,7 @@ export class NexusOrchestrator {
       } catch (e) {
         finalCode = initialCode; // Fallback to initial code if linter fails
       }
-      await this.logEvent(jobId, 'llama-3.1-70b-versatile', 'completion', 'Quality assurance complete. Code is ready.');
+      await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'completion', 'Quality assurance complete. Code is ready.');
 
       // FINAL: COMPLETE
       await this.supabase.from('agent_jobs').update({

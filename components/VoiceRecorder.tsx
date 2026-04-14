@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Mic, Square, Loader2 } from "lucide-react";
 
 export default function VoiceRecorder({ onTranscription }: { onTranscription: (text: string) => void }) {
@@ -8,6 +8,8 @@ export default function VoiceRecorder({ onTranscription }: { onTranscription: (t
   const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  // Stable animation heights — avoid Math.random() in render (causes flickering)
+  const barHeights = useMemo(() => [10, 16, 8, 14], []);
 
   const startRecording = async () => {
     try {
@@ -95,7 +97,7 @@ export default function VoiceRecorder({ onTranscription }: { onTranscription: (t
               key={i} 
               className="w-0.5 bg-[#ff4444] rounded-full animate-bounce" 
               style={{ 
-                height: `${Math.random() * 12 + 4}px`, 
+                height: `${barHeights[i - 1]}px`, 
                 animationDelay: `${i * 0.1}s`,
                 animationDuration: '0.6s'
               }} 

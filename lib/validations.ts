@@ -3,7 +3,13 @@ import { z } from "zod";
 export const AgentJobSchema = z.object({
   prompt: z.string().min(1, "Prompt is required").max(5000, "Prompt is too long"),
   userId: z.string().uuid("Invalid user ID format"),
-  imageUrl: z.string().url("Invalid image URL format").optional().or(z.string().regex(/^data:image\/(png|jpeg|webp);base64,/, "Invalid base64 image format").optional()),
+  imageUrl: z
+    .union([
+      z.string().url("Invalid image URL format"),
+      z.string().regex(/^data:image\/(png|jpeg|webp);base64,/, "Invalid base64 image format"),
+    ])
+    .optional()
+    .nullable(),
 });
 
 export const CheckoutSchema = z.object({

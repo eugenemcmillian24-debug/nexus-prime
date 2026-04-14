@@ -81,7 +81,7 @@ export default function CodePreview({ result, jobId, userId }: { result: BuildRe
           </button>
           {deploymentUrl ? (
             <a
-              href={`https://${deploymentUrl}`}
+              href={deploymentUrl!.startsWith('http') ? deploymentUrl! : `https://${deploymentUrl}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[#00ff88] hover:bg-[#00ff8811] px-2 py-1 border border-[#00ff8844] rounded-[2px] transition-all flex items-center gap-1.5 text-[10px] uppercase font-bold"

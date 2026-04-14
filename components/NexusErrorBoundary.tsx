@@ -62,7 +62,7 @@ export default class NexusErrorBoundary extends Component<Props, State> {
             </div>
 
             <button
-              onClick={handleReset}
+              onClick={this.handleReset}
               className="w-full flex items-center justify-center gap-2 bg-[#ff4444] text-black py-4 font-bold uppercase tracking-widest text-[10px] hover:bg-[#ff6666] transition-all active:scale-[0.98]"
             >
               <RefreshCw size={14} />

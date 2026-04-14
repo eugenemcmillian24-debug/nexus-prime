@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["@/lib/ai", "@nexus/ui"],
-  experimental: {
-    serverActions: true,
-  },
+  // Removed non-existent "@nexus/ui" — transpilePackages only needed for local monorepo packages
+  // serverActions is stable in Next.js 14 — no longer needs experimental flag
 };
 
 module.exports = nextConfig;
