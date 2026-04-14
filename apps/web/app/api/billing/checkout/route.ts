@@ -1,0 +1,66 @@
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { CheckoutSchema } from '@/lib/validations';
+import { ZodError } from 'zod';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2023-10-16' as any,
+});
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    
+    // 1. INPUT VALIDATION (Zod Hardening)
+    const { userId, tier } = CheckoutSchema.parse(body);
+
+    // NEXUS PRIME Pricing Model:
+    // Starter: $9/mo (100 credits)
+    // PRO: $29/mo (500 credits)
+    // Enterprise: $99/mo (2000 credits)
+    
+    let priceId = '';
+    let credits = 0;
+
+    switch (tier) {
+      case 'Starter':
+        priceId = process.env.STRIPE_STARTER_PRICE_ID!;
+        credits = 100;
+        break;
+      case 'PRO':
+        priceId = process.env.STRIPE_PRO_PRICE_ID!;
+        credits = 500;
+        break;
+      case 'Enterprise':
+        priceId = process.env.STRIPE_ENTERPRISE_PRICE_ID!;
+        credits = 2000;
+        break;
+      default:
+        return NextResponse.json({ error: 'Invalid tier selection' }, { status: 400 });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: 'subscription',
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/pricing`,
+      metadata: {
+        userId,
+        credits: credits.toString(),
+        tier,
+      },
+    });
+
+    return NextResponse.json({ url: session.url });
+  } catch (err: any) {
+    if (err instanceof ZodError) {
+      return NextResponse.json(
+        { error: 'Input Validation Failed', details: err.errors },
+        { status: 400 }
+      );
+    }
+    console.error('Checkout Error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
