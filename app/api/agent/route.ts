@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { NexusOrchestrator } from '@nexus/ai';
+import { NexusOrchestrator } from '@/lib/ai';
 import { AgentJobSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { NexusOrchestrator } from '@nexus/ai';
+import { NexusOrchestrator } from '@/lib/ai';
 import { ZodError } from 'zod';
 
 export async function POST(req: Request) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { NexusOrchestrator } from '@nexus/ai';
+import { NexusOrchestrator } from '@/lib/ai';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
