@@ -60,32 +60,35 @@ export class NexusOrchestrator {
 
   /**
    * Multi-Agent Execution Pipeline (Enhanced with Vision)
-   * 1. Vision (Gemini 1.5 Pro) -> Visual Analysis (Optional)
-   * 2. Reasoner (DeepSeek-R1) -> Logic / Chain of Thought
+   * 1. Vision (Gemini 2.0 Flash) -> Visual Analysis (Optional)
+   * 2. Reasoner (Qwen3-32B) -> Logic / Chain of Thought
    * 3. Orchestrator (Llama-70B) -> Plan / Tool Selection
    * 4. Coder (Llama-8B) -> Execution / Code Generation
+   * 5. Linter (Llama-70B) -> Quality Assurance
    */
   async executeJob(jobId: string) {
     const { data: job } = await this.supabase.from('agent_jobs').select('*').eq('id', jobId).single();
     if (!job) return;
 
     try {
+      await this.supabase.from('agent_jobs').update({ status: 'running' }).eq('id', jobId);
+
       let visualAnalysis = '';
       
-      // STEP 0: VISION ANALYSIS (Gemini 1.5 Pro)
+      // STEP 0: VISION ANALYSIS (Gemini 2.0 Flash)
       if (job.image_url) {
-        await this.logEvent(jobId, 'gemini-1.5-pro', 'thought', 'Analyzing screenshot with Gemini Vision...');
+        await this.logEvent(jobId, 'gemini-2.0-flash', 'thought', 'Analyzing screenshot with Gemini Vision...');
         visualAnalysis = await this.callGeminiVision(job.image_url, job.prompt);
-        await this.logEvent(jobId, 'gemini-1.5-pro', 'completion', visualAnalysis);
+        await this.logEvent(jobId, 'gemini-2.0-flash', 'completion', visualAnalysis);
       }
 
-      // STEP 1: REASONING (DeepSeek-R1)
-      await this.logEvent(jobId, 'deepseek-r1-distill', 'thought', 'Initializing deep reasoning...');
-      const reasoning = await this.callGroq('deepseek-r1-distill-qwen-32b', [
+      // STEP 1: REASONING (Qwen3-32B — replaced deprecated DeepSeek-R1)
+      await this.logEvent(jobId, 'qwen3-32b', 'thought', 'Initializing deep reasoning...');
+      const reasoning = await this.callGroq('qwen/qwen3-32b', [
         { role: 'system', content: 'You are the Reasoner. Break down the user prompt and visual analysis into a logical architecture.' },
         { role: 'user', content: `Prompt: ${job.prompt}\nVisual Analysis: ${visualAnalysis}` }
       ]);
-      await this.logEvent(jobId, 'deepseek-r1-distill', 'completion', reasoning);
+      await this.logEvent(jobId, 'qwen3-32b', 'completion', reasoning);
 
       // STEP 2: ORCHESTRATION (Llama-70B)
       await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'thought', 'Generating execution plan based on reasoning...');
@@ -93,7 +96,7 @@ export class NexusOrchestrator {
         { role: 'system', content: 'You are the Orchestrator. Create a task list for the Coder agent.' },
         { role: 'user', content: `Reasoning: ${reasoning}\nPrompt: ${job.prompt}` }
       ]);
-      await this.logEvent(jobId, 'llama-3.1-70b-versatile', 'completion', plan);
+      await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'completion', plan);
 
       // STEP 3: CODING (Llama-8B) - MULTI-FILE JSON
       await this.logEvent(jobId, 'llama-3.1-8b-instant', 'thought', 'Writing multi-file code structure...');
@@ -104,11 +107,12 @@ export class NexusOrchestrator {
       
       let initialCode;
       try {
-        const jsonMatch = coderResponse.match(/\{[\s\S]*\}/);
+        const jsonMatch = coderResponse.match(/\{[\\s\\S]*\}/);
         initialCode = JSON.parse(jsonMatch ? jsonMatch[0] : coderResponse);
       } catch (e) {
         initialCode = { files: [{ path: "app/page.tsx", content: coderResponse }] };
       }
+      await this.logEvent(jobId, 'llama-3.1-8b-instant', 'completion', `Generated ${initialCode.files?.length || 1} files`);
 
       // STEP 4: LINTING (Llama-70B) - QUALITY ASSURANCE
       await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'thought', 'Reviewing code for syntax and type safety...');
@@ -119,7 +123,7 @@ export class NexusOrchestrator {
 
       let finalCode;
       try {
-        const jsonMatch = linterResponse.match(/\{[\s\S]*\}/);
+        const jsonMatch = linterResponse.match(/\{[\\s\\S]*\}/);
         finalCode = JSON.parse(jsonMatch ? jsonMatch[0] : linterResponse);
       } catch (e) {
         finalCode = initialCode; // Fallback to initial code if linter fails
@@ -140,7 +144,7 @@ export class NexusOrchestrator {
 
   private async callGeminiVision(imageUrl: string, prompt: string) {
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${this.googleAIKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.googleAIKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -182,7 +186,7 @@ export class NexusOrchestrator {
     try {
       const transcription = await this.groq.audio.transcriptions.create({
         file: file as any,
-        model: 'distil-whisper-large-v3-en',
+        model: 'whisper-large-v3-turbo',
         response_format: 'verbose_json',
       });
       return transcription.text;
