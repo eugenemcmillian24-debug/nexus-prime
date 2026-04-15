@@ -13,10 +13,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-const supabase = createClient(
+const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder"
-);
+) : null as any;
 
 interface PublishedBuild {
   id: string;
@@ -79,7 +79,7 @@ export default function GalleryPage() {
     ? builds.filter(
         (b) =>
           b.title.toLowerCase().includes(search.toLowerCase()) ||
-          b.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
+          (b.tags || []).some((t) => t.toLowerCase().includes(search.toLowerCase()))
       )
     : builds;
 
@@ -186,9 +186,9 @@ export default function GalleryPage() {
                   )}
 
                   {/* Tags */}
-                  {build.tags.length > 0 && (
+                  {(build.tags || []).length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-3">
-                      {build.tags.map((tag) => (
+                      {(build.tags || []).map((tag) => (
                         <span
                           key={tag}
                           className="text-[10px] px-2 py-0.5 bg-[#111] text-[#555] border border-[#1a1a1a] rounded-sm"

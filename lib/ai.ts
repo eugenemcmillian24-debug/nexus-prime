@@ -107,8 +107,11 @@ export class NexusOrchestrator {
       
       let initialCode;
       try {
-        const jsonMatch = coderResponse.match(/\{[\\s\\S]*\}/);
+        const jsonMatch = coderResponse.match(/\{[\s\S]*\}/);
         initialCode = JSON.parse(jsonMatch ? jsonMatch[0] : coderResponse);
+        if (!initialCode?.files || !Array.isArray(initialCode.files)) {
+          initialCode = { files: [{ path: "app/page.tsx", content: coderResponse }] };
+        }
       } catch (e) {
         initialCode = { files: [{ path: "app/page.tsx", content: coderResponse }] };
       }
@@ -123,8 +126,11 @@ export class NexusOrchestrator {
 
       let finalCode;
       try {
-        const jsonMatch = linterResponse.match(/\{[\\s\\S]*\}/);
+        const jsonMatch = linterResponse.match(/\{[\s\S]*\}/);
         finalCode = JSON.parse(jsonMatch ? jsonMatch[0] : linterResponse);
+        if (!finalCode?.files || !Array.isArray(finalCode.files)) {
+          finalCode = initialCode;
+        }
       } catch (e) {
         finalCode = initialCode; // Fallback to initial code if linter fails
       }
@@ -157,7 +163,7 @@ export class NexusOrchestrator {
         })
       });
       const data = await response.json();
-      return data.candidates[0].content.parts[0].text;
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Vision analysis returned empty result.';
     } catch (e: any) {
       console.error('Gemini Vision Error:', e);
       throw new Error(`Vision Analysis Failed: ${e.message}`);

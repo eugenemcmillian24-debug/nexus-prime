@@ -368,12 +368,12 @@ export default function Page() {
             </div>
             {jobResult ? (
               <>
-                <CodePreview result={jobResult.code} jobId={jobId} userId={user.id} />
+                <CodePreview result={jobResult?.code || jobResult || { files: [] }} jobId={jobId} userId={user.id} />
                 {/* Feature 4: Iterative Refinement */}
                 <IterativeRefinement
                   jobId={jobId}
                   userId={user.id}
-                  currentCode={jobResult.code}
+                  currentCode={jobResult?.code || jobResult}
                   onNewBuild={handleNewBuild}
                 />
               </>

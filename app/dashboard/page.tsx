@@ -16,10 +16,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-const supabase = createClient(
+const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder"
-);
+) : null as any;
 
 interface DashboardStats {
   totalBuilds: number;
@@ -83,8 +83,8 @@ export default function DashboardPage() {
 
       setStats({
         totalBuilds: buildsRes.data?.length || 0,
-        creditsUsed: creditsRes.data?.lifetime_credits
-          ? creditsRes.data.lifetime_credits - creditsRes.data.balance
+        creditsUsed: (creditsRes.data?.lifetime_credits ?? creditsRes.data?.balance ?? 0)
+          ? (creditsRes.data?.lifetime_credits ?? 0) - (creditsRes.data?.balance ?? 0)
           : 0,
         creditsRemaining: creditsRes.data?.balance || 0,
         tier: creditsRes.data?.tier || "free",

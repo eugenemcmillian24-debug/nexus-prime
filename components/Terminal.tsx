@@ -65,7 +65,7 @@ export default function Terminal({ jobId }: { jobId: string }) {
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
         {events.map((event, i) => (
           <div key={i} className="animate-in fade-in slide-in-from-left-2 duration-300">
-            <span className="text-[#00ff88] mr-2">[{event.agent_name.split('-')[0].toUpperCase()}]</span>
+            <span className="text-[#00ff88] mr-2">[{(event.agent_name || 'SYSTEM').split('-')[0].toUpperCase()}]</span>
             <span className="text-[#888] mr-2">({event.event_type}):</span>
             <span className="text-white leading-relaxed">{event.content}</span>
           </div>
