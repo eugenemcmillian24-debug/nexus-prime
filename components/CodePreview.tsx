@@ -6,13 +6,20 @@ import { exportProject, BuildResult } from "@/lib/export";
 import PreviewSandbox from "@/components/PreviewSandbox";
 
 export default function CodePreview({ result, jobId, userId }: { result: BuildResult, jobId: string, userId: string }) {
+  // Defensive: normalize result to always have a valid files array
+  const safeResult: BuildResult = {
+    files: Array.isArray(result?.files) && safeResult.files.length > 0
+      ? result.files
+      : [{ path: "app/page.tsx", content: typeof result === "string" ? result : "// No code generated" }],
+  };
+
   const [copied, setCopied] = useState(false);
   const [view, setView] = useState<"code" | "preview">("code");
-  const [activeFile, setActiveFile] = useState(result.files[0]?.path || "");
+  const [activeFile, setActiveFile] = useState(safeResult.files[0]?.path || "");
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
 
-  const activeContent = result.files.find(f => f.path === activeFile)?.content || "";
+  const activeContent = safeResult.files.find(f => f.path === activeFile)?.content || "";
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(activeContent);
@@ -21,7 +28,7 @@ export default function CodePreview({ result, jobId, userId }: { result: BuildRe
   };
 
   const handleDownload = async () => {
-    await exportProject(result);
+    await exportProject(safeResult);
   };
 
   const handleDeploy = async () => {
@@ -110,7 +117,7 @@ export default function CodePreview({ result, jobId, userId }: { result: BuildRe
               Project Explorer
             </div>
             <div className="p-2 space-y-1">
-              {result.files.map((file) => (
+              {safeResult.files.map((file) => (
                 <button
                   key={file.path}
                   onClick={() => setActiveFile(file.path)}
@@ -133,14 +140,14 @@ export default function CodePreview({ result, jobId, userId }: { result: BuildRe
               <code>{activeContent}</code>
             </pre>
           ) : (
-            <PreviewSandbox result={result} />
+            <PreviewSandbox result={safeResult} />
           )}
         </div>
       </div>
 
       {/* Footer */}
       <div className="px-4 py-2 bg-[#050505] border-t border-[#1a1a1a] flex justify-between items-center text-[9px] text-[#333] uppercase tracking-widest">
-        <span>Files: {result.files.length} | Active: {activeFile}</span>
+        <span>Files: {safeResult.files.length} | Active: {activeFile}</span>
         <span className="flex items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88] animate-pulse" />
           Ready for Deployment
