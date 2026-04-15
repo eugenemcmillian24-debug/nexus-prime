@@ -3,11 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 import { NexusOrchestrator } from '@/lib/ai';
 import { AgentJobSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
+import { waitUntil } from '@vercel/functions';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+export const maxDuration = 300; // 5 min max for orchestrator pipeline
 
 export async function POST(req: Request) {
   try {
@@ -29,7 +32,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. Create Job
+    // 3. Create Job
     const { data: job, error: jobError } = await supabase
       .from('agent_jobs')
       .insert({
@@ -37,31 +40,31 @@ export async function POST(req: Request) {
         status: 'pending',
         agent_type: 'builder',
         prompt,
-        image_url: imageUrl, // For Vision-based builds
+        image_url: imageUrl,
         credits_cost: 10
       })
       .select()
       .single();
 
     if (jobError) {
-      // Refund if job creation fails (Rollback simulation)
+      // Refund if job creation fails
       await supabase.rpc('deduct_user_credits', {
         target_user_id: userId,
-        amount_to_deduct: -10 // Add back
+        amount_to_deduct: -10
       });
       throw jobError;
     }
 
-    // 3. Trigger Orchestrator (Async)
+    // 4. Trigger Orchestrator (Background — waitUntil keeps function alive after response)
     const orchestrator = new NexusOrchestrator({
       groqKey: process.env.GROQ_API_KEY!,
       openRouterKey: process.env.OPENROUTER_API_KEY!,
-      googleAIKey: process.env.GOOGLE_AI_KEY!, // Added for Gemini 1.5 Pro
+      googleAIKey: process.env.GOOGLE_AI_KEY!,
       supabaseUrl: process.env.SUPABASE_URL!,
       supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
     });
 
-    orchestrator.executeJob(job.id);
+    waitUntil(orchestrator.executeJob(job.id));
 
     return NextResponse.json({ jobId: job.id, newBalance: result.new_balance });
 
