@@ -6,10 +6,13 @@ import CreditHistory from "@/components/CreditHistory";
 import CodePreview from "@/components/CodePreview";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import ScreenshotUpload from "@/components/ScreenshotUpload";
+import ProjectHistory from "@/components/ProjectHistory";
+import IterativeRefinement from "@/components/IterativeRefinement";
 import Login from "@/components/Login";
 import { createClient, User, AuthChangeEvent, Session, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
-import { NEXUS_TEMPLATES } from "@/lib/templates";
+import { NEXUS_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/templates";
 import * as Icons from "lucide-react";
+import Link from "next/link";
 
 const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
@@ -27,10 +30,11 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showProjectHistory, setShowProjectHistory] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  const [templateCategory, setTemplateCategory] = useState("all");
 
   useEffect(() => {
-    // 1. Initial Auth Check
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
@@ -39,7 +43,6 @@ export default function Page() {
 
     checkUser();
 
-    // 2. Auth State Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
     });
@@ -50,7 +53,6 @@ export default function Page() {
   useEffect(() => {
     if (!user) return;
 
-    // 3. Fetch Profile & Credits
     const fetchUserData = async () => {
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       const { data: creditData } = await supabase.from('user_credits').select('*').eq('user_id', user.id).single();
@@ -60,7 +62,6 @@ export default function Page() {
 
     fetchUserData();
 
-    // 4. Realtime Credits Subscription
     const channel = supabase
       .channel(`credits-${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_credits', filter: `user_id=eq.${user.id}` }, (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
@@ -150,6 +151,27 @@ export default function Page() {
     await supabase.auth.signOut();
   };
 
+  const handleLoadBuild = (build: any) => {
+    if (build.result?.code) {
+      setJobId(build.id);
+      setJobResult(build.result);
+      setShowProjectHistory(false);
+    }
+  };
+
+  const handleForkBuild = (build: any) => {
+    setPrompt(build.prompt || "");
+    setShowProjectHistory(false);
+  };
+
+  const handleNewBuild = (newResult: any) => {
+    setJobResult(newResult);
+  };
+
+  const filteredTemplates = templateCategory === "all"
+    ? NEXUS_TEMPLATES
+    : NEXUS_TEMPLATES.filter(t => t.category === templateCategory);
+
   if (authLoading) return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center">
       <div className="w-12 h-12 border border-dashed border-[#00ff88] rounded-full animate-spin" />
@@ -167,15 +189,27 @@ export default function Page() {
             <div className="w-8 h-8 bg-[#00ff88] rounded-sm flex items-center justify-center text-black font-bold">N</div>
             <h1 className="text-xl font-bold tracking-tighter text-white uppercase tracking-widest">Nexus Prime</h1>
           </div>
-          <div className="flex gap-6 text-xs uppercase tracking-widest items-center">
+          <div className="flex gap-4 text-xs uppercase tracking-widest items-center">
+            <Link href="/dashboard" className="text-[#444] hover:text-white transition-all">
+              [ Dashboard ]
+            </Link>
+            <Link href="/gallery" className="text-[#444] hover:text-white transition-all">
+              [ Gallery ]
+            </Link>
             <button 
-              onClick={() => { setShowHistory(!showHistory); setShowPricing(false); }} 
-              className={`hover:text-white transition-all ${showHistory ? 'text-white' : 'text-[#444]'}`}
+              onClick={() => { setShowProjectHistory(!showProjectHistory); setShowHistory(false); setShowPricing(false); }} 
+              className={`hover:text-white transition-all ${showProjectHistory ? 'text-white' : 'text-[#444]'}`}
             >
-              [ History ]
+              [ Builds ]
             </button>
             <button 
-              onClick={() => { setShowPricing(!showPricing); setShowHistory(false); }} 
+              onClick={() => { setShowHistory(!showHistory); setShowProjectHistory(false); setShowPricing(false); }} 
+              className={`hover:text-white transition-all ${showHistory ? 'text-white' : 'text-[#444]'}`}
+            >
+              [ Credits ]
+            </button>
+            <button 
+              onClick={() => { setShowPricing(!showPricing); setShowHistory(false); setShowProjectHistory(false); }} 
               className="text-[#00ff88] hover:underline transition-all"
             >
               [ Buy Credits ]
@@ -233,14 +267,47 @@ export default function Page() {
           </div>
         )}
 
+        {/* Project History Overlay (Feature 1) */}
+        {showProjectHistory && (
+          <div className="animate-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-white text-xs font-bold tracking-[0.3em] uppercase">Build History</h2>
+              <button onClick={() => setShowProjectHistory(false)} className="text-[#444] hover:text-white">✕</button>
+            </div>
+            <ProjectHistory
+              userId={user.id}
+              onLoadBuild={handleLoadBuild}
+              onForkBuild={handleForkBuild}
+            />
+          </div>
+        )}
+
         {/* Input Section */}
-        {!jobId && !showPricing && !showHistory ? (
+        {!jobId && !showPricing && !showHistory && !showProjectHistory ? (
           <div className="space-y-8 animate-in fade-in duration-500">
-            {/* Templates Section */}
+            {/* Templates Section (Feature 3 - Enhanced) */}
             <div className="space-y-4">
-              <div className="text-xs uppercase tracking-widest text-[#444]">Seed Templates</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs uppercase tracking-widest text-[#444]">Seed Templates</div>
+                {/* Category Filter */}
+                <div className="flex items-center gap-1">
+                  {TEMPLATE_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setTemplateCategory(cat.id)}
+                      className={`px-2 py-1 text-[9px] uppercase tracking-wider rounded-sm transition-colors ${
+                        templateCategory === cat.id
+                          ? "bg-[#00ff88]/10 text-[#00ff88]"
+                          : "text-[#333] hover:text-[#666]"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {NEXUS_TEMPLATES.map((template) => {
+                {filteredTemplates.map((template) => {
                   const Icon = (Icons as any)[template.icon] || Icons.FileCode;
                   return (
                     <button
@@ -300,7 +367,16 @@ export default function Page() {
               </button>
             </div>
             {jobResult ? (
-              <CodePreview result={jobResult.code} jobId={jobId} userId={user.id} />
+              <>
+                <CodePreview result={jobResult.code} jobId={jobId} userId={user.id} />
+                {/* Feature 4: Iterative Refinement */}
+                <IterativeRefinement
+                  jobId={jobId}
+                  userId={user.id}
+                  currentCode={jobResult.code}
+                  onNewBuild={handleNewBuild}
+                />
+              </>
             ) : (
               <Terminal jobId={jobId} />
             )}
