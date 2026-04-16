@@ -9,3 +9,6 @@ export { default as VersionControl } from "./VersionControl";
 export { default as AICodeReview } from "./AICodeReview";
 export { default as DeploymentPipeline } from "./DeploymentPipeline";
 export { default as TeamWorkspace } from "./TeamWorkspace";
+export { default as PromptHistory } from "./PromptHistory";
+export { default as NotificationCenter } from "./NotificationCenter";
+export { default as ProjectSettings } from "./ProjectSettings";
