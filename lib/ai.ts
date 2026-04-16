@@ -108,12 +108,13 @@ export class NexusOrchestrator {
       let initialCode;
       try {
         const jsonMatch = coderResponse.match(/\{[\s\S]*\}/);
-        initialCode = JSON.parse(jsonMatch ? jsonMatch[0] : coderResponse);
+        const jsonString = jsonMatch ? jsonMatch[0] : coderResponse;
+        initialCode = JSON.parse(jsonString);
         if (!initialCode?.files || !Array.isArray(initialCode.files)) {
-          initialCode = { files: [{ path: "app/page.tsx", content: coderResponse }] };
+          throw new Error('Invalid JSON structure');
         }
       } catch (e) {
-        initialCode = { files: [{ path: "app/page.tsx", content: coderResponse }] };
+        initialCode = { files: [{ path: "app/page.tsx", content: coderResponse.replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*/g, '').replace(/```/g, '')).trim() }] };
       }
       await this.logEvent(jobId, 'llama-3.1-8b-instant', 'completion', `Generated ${initialCode.files?.length || 1} files`);
 
@@ -127,7 +128,8 @@ export class NexusOrchestrator {
       let finalCode;
       try {
         const jsonMatch = linterResponse.match(/\{[\s\S]*\}/);
-        finalCode = JSON.parse(jsonMatch ? jsonMatch[0] : linterResponse);
+        const jsonString = jsonMatch ? jsonMatch[0] : linterResponse;
+        finalCode = JSON.parse(jsonString);
         if (!finalCode?.files || !Array.isArray(finalCode.files)) {
           finalCode = initialCode;
         }
@@ -149,7 +151,17 @@ export class NexusOrchestrator {
   }
 
   private async callGeminiVision(imageUrl: string, prompt: string) {
+    if (!this.googleAIKey || this.googleAIKey === 'undefined') {
+      throw new Error('Google AI Key is missing. Vision features are disabled.');
+    }
     try {
+      // Defensive check for image data format
+      if (!imageUrl || (!imageUrl.startsWith('data:image/') && imageUrl.length < 50)) {
+        throw new Error('Invalid image format. Expected a base64 data URL.');
+      }
+
+      const base64Data = imageUrl.includes(',') ? imageUrl.split(',')[1] : imageUrl;
+
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.googleAIKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -157,12 +169,13 @@ export class NexusOrchestrator {
           contents: [{
             parts: [
               { text: `Analyze this screenshot and describe the UI layout, colors, and components in detail. Use this to help build the app described: ${prompt}` },
-              { inline_data: { mime_type: "image/png", data: imageUrl.split(',')[1] } }
+              { inline_data: { mime_type: "image/png", data: base64Data } }
             ]
           }]
         })
       });
       const data = await response.json();
+      if (data.error) throw new Error(data.error.message || 'Gemini Vision API Error');
       return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Vision analysis returned empty result.';
     } catch (e: any) {
       console.error('Gemini Vision Error:', e);
