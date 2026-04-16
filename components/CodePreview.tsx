@@ -8,7 +8,7 @@ import PreviewSandbox from "@/components/PreviewSandbox";
 export default function CodePreview({ result, jobId, userId }: { result: BuildResult, jobId: string, userId: string }) {
   // Defensive: normalize result to always have a valid files array
   const safeResult: BuildResult = {
-    files: Array.isArray(result?.files) && safeResult.files.length > 0
+    files: Array.isArray(result?.files) && result.files.length > 0
       ? result.files
       : [{ path: "app/page.tsx", content: typeof result === "string" ? result : "// No code generated" }],
   };
