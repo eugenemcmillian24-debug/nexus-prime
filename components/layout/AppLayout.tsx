@@ -18,6 +18,9 @@ const TeamWorkspace = dynamic(() => import("@/components/features/TeamWorkspace"
 const PromptHistory = dynamic(() => import("@/components/features/PromptHistory"), { ssr: false });
 const NotificationCenter = dynamic(() => import("@/components/features/NotificationCenter"), { ssr: false });
 const ProjectSettings = dynamic(() => import("@/components/features/ProjectSettings"), { ssr: false });
+const RealtimeCollab = dynamic(() => import("@/components/features/RealtimeCollab"), { ssr: false });
+const ApiKeyManager = dynamic(() => import("@/components/features/ApiKeyManager"), { ssr: false });
+const TemplateMarketplace = dynamic(() => import("@/components/features/TemplateMarketplace"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -38,10 +41,12 @@ const NAV_ITEMS: NavItem[] = [
   { id: "models", label: "Models", icon: "🧠", section: "ai" },
   { id: "review", label: "Code Review", icon: "🔍", section: "ai" },
   { id: "history", label: "Prompt History", icon: "📜", section: "ai" },
+  { id: "marketplace", label: "Marketplace", icon: "🏪", section: "ai" },
   { id: "components", label: "Components", icon: "🧩", section: "ai" },
   // Platform
   { id: "analytics", label: "Analytics", icon: "📊", section: "platform" },
   { id: "team", label: "Team", icon: "👥", section: "platform" },
+  { id: "keys", label: "API Keys", icon: "🔑", section: "platform" },
   { id: "notifications", label: "Notifications", icon: "🔔", section: "platform" },
   { id: "settings", label: "Settings", icon: "⚙️", section: "platform" },
 ];
@@ -70,7 +75,7 @@ export default function AppLayout({ userId, projectId, projectName }: AppLayoutP
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeFiles, setActiveFiles] = useState<AppFile[]>([]);
   const [currentFile, setCurrentFile] = useState<AppFile | null>(null);
-  const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy">("none");
+  const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab">("none");
 
   const handleFileSelect = useCallback((file: AppFile) => {
     setCurrentFile(file);
@@ -90,7 +95,7 @@ export default function AppLayout({ userId, projectId, projectName }: AppLayoutP
     });
   }, [currentFile]);
 
-  const toggleRightPanel = (panel: "review" | "versions" | "deploy") => {
+  const toggleRightPanel = (panel: "review" | "versions" | "deploy" | "collab") => {
     setRightPanel((prev) => (prev === panel ? "none" : panel));
   };
 
@@ -172,6 +177,14 @@ export default function AppLayout({ userId, projectId, projectName }: AppLayoutP
                     currentVersion={1}
                   />
                 )}
+                {rightPanel === "collab" && (
+                  <RealtimeCollab
+                    projectId={projectId}
+                    userId={userId}
+                    userName="You"
+                    currentFile={currentFile?.path}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -218,11 +231,15 @@ export default function AppLayout({ userId, projectId, projectName }: AppLayoutP
       case "team":
         return <TeamWorkspace userId={userId} />;
       case "history":
-        return <PromptHistory projectId={projectId} onReplayPrompt={(prompt, model) => { setActiveView("editor"); /* TODO: inject prompt */ }} />;
+        return <PromptHistory projectId={projectId} onReplayPrompt={(prompt, model) => { setActiveView("editor"); }} />;
+      case "marketplace":
+        return <TemplateMarketplace userId={userId} />;
       case "notifications":
         return <NotificationCenter userId={userId} />;
       case "settings":
         return <ProjectSettings projectId={projectId} />;
+      case "keys":
+        return <ApiKeyManager userId={userId} />;
       default:
         return <EmptyState icon="🚀" title="Nexus Prime" message="Select a tool from the sidebar" />;
     }
@@ -355,6 +372,7 @@ export default function AppLayout({ userId, projectId, projectName }: AppLayoutP
                   { panel: "review" as const, icon: "🔍", label: "Review" },
                   { panel: "versions" as const, icon: "📸", label: "Versions" },
                   { panel: "deploy" as const, icon: "🚀", label: "Deploy" },
+                  { panel: "collab" as const, icon: "👥", label: "Live" },
                 ] as const).map(({ panel, icon, label }) => (
                   <button
                     key={panel}
