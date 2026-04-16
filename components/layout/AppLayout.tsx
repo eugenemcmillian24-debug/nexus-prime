@@ -21,6 +21,10 @@ const ProjectSettings = dynamic(() => import("@/components/features/ProjectSetti
 const RealtimeCollab = dynamic(() => import("@/components/features/RealtimeCollab"), { ssr: false });
 const ApiKeyManager = dynamic(() => import("@/components/features/ApiKeyManager"), { ssr: false });
 const TemplateMarketplace = dynamic(() => import("@/components/features/TemplateMarketplace"), { ssr: false });
+const ContextAwareSuggestions = dynamic(() => import("@/components/features/ContextAwareSuggestions"), { ssr: false });
+const CustomDomains = dynamic(() => import("@/components/features/CustomDomains"), { ssr: false });
+const WebhooksApiAccess = dynamic(() => import("@/components/features/WebhooksApiAccess"), { ssr: false });
+const ExportToGitHub = dynamic(() => import("@/components/features/ExportToGitHub"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -41,11 +45,15 @@ const NAV_ITEMS: NavItem[] = [
   { id: "models", label: "Models", icon: "🧠", section: "ai" },
   { id: "review", label: "Code Review", icon: "🔍", section: "ai" },
   { id: "history", label: "Prompt History", icon: "📜", section: "ai" },
+  { id: "suggestions", label: "AI Suggestions", icon: "🧠", section: "ai" },
   { id: "marketplace", label: "Marketplace", icon: "🏪", section: "ai" },
   { id: "components", label: "Components", icon: "🧩", section: "ai" },
   // Platform
   { id: "analytics", label: "Analytics", icon: "📊", section: "platform" },
   { id: "team", label: "Team", icon: "👥", section: "platform" },
+  { id: "domains", label: "Domains", icon: "🌐", section: "platform" },
+  { id: "webhooks", label: "Webhooks & API", icon: "🔌", section: "platform" },
+  { id: "export", label: "Export to GitHub", icon: "📤", section: "platform" },
   { id: "keys", label: "API Keys", icon: "🔑", section: "platform" },
   { id: "notifications", label: "Notifications", icon: "🔔", section: "platform" },
   { id: "settings", label: "Settings", icon: "⚙️", section: "platform" },
@@ -234,6 +242,14 @@ export default function AppLayout({ userId, projectId, projectName }: AppLayoutP
         return <PromptHistory projectId={projectId} onReplayPrompt={(prompt, model) => { setActiveView("editor"); }} />;
       case "marketplace":
         return <TemplateMarketplace userId={userId} />;
+      case "suggestions":
+        return <ContextAwareSuggestions projectId={projectId} currentFile={currentFile?.path} />;
+      case "domains":
+        return <CustomDomains projectId={projectId} projectName={projectName} />;
+      case "webhooks":
+        return <WebhooksApiAccess projectId={projectId} />;
+      case "export":
+        return <ExportToGitHub projectId={projectId} projectName={projectName} />;
       case "notifications":
         return <NotificationCenter userId={userId} />;
       case "settings":

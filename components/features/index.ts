@@ -15,3 +15,7 @@ export { default as ProjectSettings } from "./ProjectSettings";
 export { default as RealtimeCollab } from "./RealtimeCollab";
 export { default as ApiKeyManager } from "./ApiKeyManager";
 export { default as TemplateMarketplace } from "./TemplateMarketplace";
+export { default as ContextAwareSuggestions } from "./ContextAwareSuggestions";
+export { default as CustomDomains } from "./CustomDomains";
+export { default as WebhooksApiAccess } from "./WebhooksApiAccess";
+export { default as ExportToGitHub } from "./ExportToGitHub";
