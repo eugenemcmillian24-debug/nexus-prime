@@ -67,6 +67,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  const supabase = createClient();
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get("page") || "1");
   const limit = Math.min(parseInt(searchParams.get("limit") || "12"), 50);
