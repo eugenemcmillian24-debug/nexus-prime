@@ -54,7 +54,7 @@ export default function ModelSelector({
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const renderModelGroup = (title: string, models: ModelOption[], key: keyof ModelSelection, icon: typeof Brain) => {
+  const renderModelGroup = (title: string, models: ModelOption[], key: keyof ModelSelection, Icon: typeof Brain) => {
     const selected = models.find((m) => m.id === selection[key]) || models[0];
     const isExpanded = expanded === key;
 
@@ -65,7 +65,7 @@ export default function ModelSelector({
           className="w-full flex items-center justify-between px-3 py-2.5 bg-[#080808] hover:bg-[#0c0c0c] transition-all"
         >
           <div className="flex items-center gap-2">
-            <icon size={12} className="text-[#00ff88]" />
+            <Icon size={12} className="text-[#00ff88]" />
             <span className="text-[9px] uppercase font-bold tracking-widest text-[#666]">{title}</span>
             <span className="text-[10px] text-white font-mono">{selected.name}</span>
           </div>
