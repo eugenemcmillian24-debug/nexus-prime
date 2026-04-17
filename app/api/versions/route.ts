@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   // List all versions
   const { data, error } = await supabase
     .from("project_versions")
-    .select("id, version_number, message, diff_summary, created_at")
+    .select("id, version_number, message, snapshot, diff_summary, created_at")
     .eq("project_id", projectId)
     .order("version_number", { ascending: false });
 

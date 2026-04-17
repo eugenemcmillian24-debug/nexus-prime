@@ -169,13 +169,16 @@ export default function VersionControl({
   }, [projectId]);
 
   const loadVersions = async () => {
-    const { data } = await supabase
-      .from("project_versions")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("version_number", { ascending: false });
-
-    setVersions(data || []);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/versions?project_id=${projectId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setVersions(data.versions || []);
+      }
+    } catch (err) {
+      console.error("Failed to load versions:", err);
+    }
     setLoading(false);
   };
 
@@ -184,35 +187,49 @@ export default function VersionControl({
     setCommitting(true);
 
     try {
-      const { data, error } = await supabase.rpc("create_version", {
-        p_project_id: projectId,
-        p_message: commitMessage.trim(),
+      const res = await fetch("/api/versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: projectId,
+          message: commitMessage.trim(),
+        }),
       });
 
-      if (!error) {
+      if (res.ok) {
         await loadVersions();
         setCommitMessage("");
         setShowCommitForm(false);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Failed to create version:", err);
     }
     setCommitting(false);
   };
 
   const handleRollback = async (versionNumber: number) => {
+    if (onRollback) {
+      onRollback(versionNumber);
+      setRollbackConfirm(null);
+      return;
+    }
+    
     try {
-      const { error } = await supabase.rpc("rollback_to_version", {
-        p_project_id: projectId,
-        p_version_number: versionNumber,
+      const res = await fetch("/api/versions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: projectId,
+          version_number: versionNumber,
+        }),
       });
 
-      if (!error) {
-        onRollback?.(versionNumber);
+      if (res.ok) {
+        await loadVersions();
         setRollbackConfirm(null);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Rollback failed:", err);
     }
   };
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 export const AgentJobSchema = z.object({
   prompt: z.string().min(1, "Prompt is required").max(5000, "Prompt is too long"),
   userId: z.string().uuid("Invalid user ID format"),
+  projectId: z.string().uuid("Invalid project ID format").optional().nullable(),
   imageUrl: z
     .union([
       z.string().url("Invalid image URL format"),

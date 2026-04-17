@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     
     // 1. INPUT VALIDATION (Zod Hardening)
-    const { prompt, userId, imageUrl } = AgentJobSchema.parse(body);
+    const { prompt, userId, imageUrl, projectId } = AgentJobSchema.parse(body);
 
     // 2. NEXUS GUARD: Atomic Credit Deduction
     const { data: result, error: rpcError } = await supabase.rpc('deduct_user_credits', {
@@ -41,6 +41,7 @@ export async function POST(req: Request) {
         agent_type: 'builder',
         prompt,
         image_url: imageUrl,
+        project_id: projectId,
         credits_cost: 10
       })
       .select()
