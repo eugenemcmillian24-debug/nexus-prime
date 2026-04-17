@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 
 // Lazy-load all feature components for code splitting
 const PromptTemplates = dynamic(() => import("@/components/features/PromptTemplates"), { ssr: false });
@@ -394,12 +395,12 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
           {!sidebarCollapsed && (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "8px", textDecoration: "none" }}>
               <span style={{ fontSize: "18px" }}>⚡</span>
               <span style={{ fontSize: "15px", fontWeight: 700, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 Nexus Prime
               </span>
-            </div>
+            </Link>
           )}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
