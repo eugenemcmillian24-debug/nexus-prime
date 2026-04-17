@@ -25,6 +25,7 @@ const ContextAwareSuggestions = dynamic(() => import("@/components/features/Cont
 const CustomDomains = dynamic(() => import("@/components/features/CustomDomains"), { ssr: false });
 const WebhooksApiAccess = dynamic(() => import("@/components/features/WebhooksApiAccess"), { ssr: false });
 const ExportToGitHub = dynamic(() => import("@/components/features/ExportToGitHub"), { ssr: false });
+const FigmaImport = dynamic(() => import("@/components/features/FigmaImport"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -47,6 +48,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "history", label: "Prompt History", icon: "📜", section: "ai" },
   { id: "suggestions", label: "AI Suggestions", icon: "🧠", section: "ai" },
   { id: "marketplace", label: "Marketplace", icon: "🏪", section: "ai" },
+  { id: "figma", label: "Figma Sync", icon: "🎨", section: "ai", badge: "NEW" },
   { id: "components", label: "Components", icon: "🧩", section: "ai" },
   // Platform
   { id: "analytics", label: "Analytics", icon: "📊", section: "platform" },
@@ -269,6 +271,8 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
         return <PromptHistory projectId={projectId} onReplayPrompt={(prompt, model) => { setActiveView("editor"); }} />;
       case "marketplace":
         return <TemplateMarketplace userId={userId} />;
+      case "figma":
+        return <FigmaImport projectId={projectId} onImportComplete={() => setActiveView("editor")} />;
       case "suggestions":
         return <ContextAwareSuggestions projectId={projectId} currentFile={currentFile?.path} />;
       case "domains":

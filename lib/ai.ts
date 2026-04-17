@@ -69,6 +69,32 @@ STRUCTURE:
 OUTPUT: Return ONLY the raw JSON string. No conversational filler.
 `.trim();
 
+const FIGMA_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Figma-to-Code Agent. You translate Figma JSON nodes into high-fidelity React components.
+STACK: Next.js 14, TypeScript, Tailwind CSS, Lucide React.
+
+INPUT: A JSON representation of a Figma node (component, frame, or group).
+
+TASK:
+1. ANALYZE the node's properties: dimensions, colors (fills), strokes, effects (shadows), and layout (Flex/Auto-layout).
+2. MAP Figma properties to Tailwind CSS classes accurately.
+3. GENERATE a clean React component using TypeScript.
+4. OUTPUT: Return ONLY a JSON object with the component files.
+
+STRUCTURE:
+{
+  "files": [
+    { "path": "string", "content": "string" }
+  ]
+}
+
+RULES:
+- Handle Auto-layout as Flexbox.
+- Convert absolute positioning where necessary.
+- Extract text styles into Tailwind font classes.
+- Export components as default.
+`.trim();
+
 export class NexusOrchestrator {
   private groq: Groq;
   private supabase: any;
@@ -352,5 +378,32 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
       console.error("Failed to parse DevOps Agent response:", response);
       throw new Error("AI failed to produce a structured fix. Please check the logs manually.");
     }
+  }
+
+  /**
+   * Import Figma nodes and convert them to React components
+   */
+  async importFromFigma(figmaData: any) {
+    // Process multiple nodes if provided
+    const nodes = Array.isArray(figmaData.nodes) ? figmaData.nodes : [figmaData.node];
+    const results = [];
+
+    for (const node of nodes) {
+      const response = await this.callGroq('llama-3.3-70b-versatile', [
+        { role: 'system', content: FIGMA_SYSTEM_PROMPT },
+        { role: 'user', content: `Figma Node Data: ${JSON.stringify(node)}` }
+      ]);
+
+      try {
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        const jsonString = jsonMatch ? jsonMatch[0] : response;
+        const result = JSON.parse(jsonString);
+        results.push(...result.files);
+      } catch (e) {
+        console.error("Figma conversion failed for node:", node.name, e);
+      }
+    }
+
+    return { files: results };
   }
 }
