@@ -45,6 +45,30 @@ RULES:
 If the code is already perfect, return the original JSON unchanged.
 `.trim();
 
+const DEVOPS_SYSTEM_PROMPT = `
+You are the NEXUS PRIME DevOps Agent. Your specialty is diagnosing and fixing build/deployment failures.
+STACK: Next.js 14 (App Router), TypeScript, Vercel.
+
+INPUT:
+1. BUILD LOG / ERROR MESSAGE: The exact error from the deployment platform.
+2. CURRENT FILES: The relevant project files that might be causing the issue.
+
+TASK:
+1. ANALYZE the error log to find the specific file and line number (if available).
+2. IDENTIFY the root cause (e.g., Type error, missing import, incorrect prop assignment, environment variable mismatch).
+3. PROVIDE THE FIX: Return ONLY a JSON object containing the corrected versions of the affected files.
+
+STRUCTURE:
+{
+  "analysis": "Brief explanation of what was wrong and how you fixed it.",
+  "files": [
+    { "path": "string", "content": "string" }
+  ]
+}
+
+OUTPUT: Return ONLY the raw JSON string. No conversational filler.
+`.trim();
+
 export class NexusOrchestrator {
   private groq: Groq;
   private supabase: any;
@@ -277,6 +301,56 @@ export class NexusOrchestrator {
     } catch (e: any) {
       console.error('Vercel API Error:', e);
       throw e;
+    }
+  }
+
+  /**
+   * Heal a failed deployment using AI analysis
+   */
+  async healDeployment(deploymentId: string) {
+    // 1. Fetch deployment details
+    const { data: deploy, error: deployError } = await this.supabase
+      .from('deployments')
+      .select('*')
+      .eq('id', deploymentId)
+      .single();
+
+    if (deployError || !deploy) throw new Error("Deployment not found");
+    if (deploy.status !== 'failed') throw new Error("Only failed deployments can be healed.");
+
+    // 2. Fetch project files
+    const { data: files } = await this.supabase
+      .from('project_files')
+      .select('path, content')
+      .eq('project_id', deploy.project_id);
+
+    if (!files || files.length === 0) throw new Error("No files found for this project.");
+
+    // 3. Call DevOps Agent
+    const errorLog = deploy.build_log || deploy.error_message || "Unknown build error";
+    
+    // We only send the relevant error context and files to save tokens
+    // In a real scenario, we might filter files based on the error log mentions
+    const prompt = `
+Build Log:
+${errorLog}
+
+Current Files:
+${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
+    `;
+
+    const response = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: DEVOPS_SYSTEM_PROMPT },
+      { role: 'user', content: prompt }
+    ]);
+
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonString = jsonMatch ? jsonMatch[0] : response;
+      return JSON.parse(jsonString);
+    } catch (e) {
+      console.error("Failed to parse DevOps Agent response:", response);
+      throw new Error("AI failed to produce a structured fix. Please check the logs manually.");
     }
   }
 }

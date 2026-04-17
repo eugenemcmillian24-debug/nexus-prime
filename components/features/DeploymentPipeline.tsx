@@ -46,6 +46,8 @@ export default function DeploymentPipeline({
   const [selectedEnv, setSelectedEnv] = useState<"preview" | "production">("preview");
   const [showLogs, setShowLogs] = useState<string | null>(null);
   const [confirmProd, setConfirmProd] = useState(false);
+  const [healingId, setHealingId] = useState<string | null>(null);
+  const [healResult, setHealResult] = useState<{ analysis: string; files: any[] } | null>(null);
 
   useEffect(() => {
     fetchDeployments();
@@ -143,6 +145,46 @@ export default function DeploymentPipeline({
       fetchDeployments();
     } catch (error) {
       console.error("Rollback failed:", error);
+    }
+  };
+
+  const healWithAI = async (deployId: string) => {
+    setHealingId(deployId);
+    setHealResult(null);
+    try {
+      const res = await fetch("/api/deployments/heal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deploymentId: deployId }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setHealResult(result);
+        setShowLogs(deployId);
+      } else {
+        alert("Healing failed. Please try again or check logs.");
+      }
+    } catch (error) {
+      console.error("Heal failed:", error);
+    } finally {
+      setHealingId(null);
+    }
+  };
+
+  const applyHeal = async () => {
+    if (!healResult) return;
+    try {
+      const res = await fetch("/api/deployments/heal/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, files: healResult.files }),
+      });
+      if (res.ok) {
+        setHealResult(null);
+        triggerDeploy(selectedEnv);
+      }
+    } catch (error) {
+      console.error("Apply heal failed:", error);
     }
   };
 
@@ -355,6 +397,20 @@ export default function DeploymentPipeline({
                       >
                         Logs
                       </button>
+                      {deploy.status === "failed" && (
+                        <button
+                          onClick={() => healWithAI(deploy.id)}
+                          disabled={healingId === deploy.id}
+                          style={{
+                            padding: "4px 10px", borderRadius: "6px",
+                            border: "1px solid #00ff8844", background: "#00ff8811",
+                            color: "#00ff88", fontSize: "12px", cursor: "pointer",
+                            display: "flex", alignItems: "center", gap: "4px"
+                          }}
+                        >
+                          {healingId === deploy.id ? "✨ Healing..." : "✨ Heal with AI"}
+                        </button>
+                      )}
                       {deploy.status === "ready" && deploy.environment === "production" && (
                         <button
                           onClick={() => rollbackDeploy(deploy.id)}
@@ -371,14 +427,54 @@ export default function DeploymentPipeline({
                   </div>
                   {/* Logs */}
                   {showLogs === deploy.id && (
-                    <pre style={{
-                      marginTop: "12px", padding: "10px", borderRadius: "6px",
-                      background: "#0a0a0a", border: "1px solid #262626",
-                      fontSize: "11px", color: "#a3a3a3", overflow: "auto",
-                      maxHeight: "200px", whiteSpace: "pre-wrap",
-                    }}>
-                      {deploy.buildLog || deploy.errorMessage || "No logs available"}
-                    </pre>
+                    <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                      <pre style={{
+                        padding: "10px", borderRadius: "6px",
+                        background: "#0a0a0a", border: "1px solid #262626",
+                        fontSize: "11px", color: "#a3a3a3", overflow: "auto",
+                        maxHeight: "200px", whiteSpace: "pre-wrap",
+                      }}>
+                        {deploy.buildLog || deploy.errorMessage || "No logs available"}
+                      </pre>
+
+                      {healResult && showLogs === deploy.id && (
+                        <div style={{
+                          padding: "16px", borderRadius: "8px",
+                          background: "#00ff8808", border: "1px solid #00ff8822",
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                            <div>
+                              <div style={{ fontSize: "12px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", tracking: "0.1em" }}>
+                                AI Healing Analysis
+                              </div>
+                              <p style={{ fontSize: "11px", color: "#e5e5e5", marginTop: "4px", lineHeight: "1.4" }}>
+                                {healResult.analysis}
+                              </p>
+                            </div>
+                            <button
+                              onClick={applyHeal}
+                              style={{
+                                padding: "6px 12px", borderRadius: "6px", border: "none",
+                                background: "#00ff88", color: "#000", fontWeight: 700,
+                                fontSize: "11px", cursor: "pointer", whiteSpace: "nowrap"
+                              }}
+                            >
+                              Apply Fix & Redeploy
+                            </button>
+                          </div>
+                          <div style={{ fontSize: "10px", color: "#525252", fontWeight: 600, marginBottom: "6px" }}>
+                            MODIFIED FILES ({healResult.files.length})
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            {healResult.files.map((f: any) => (
+                              <div key={f.path} style={{ fontSize: "11px", color: "#a3a3a3", display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span style={{ color: "#00ff88" }}>+</span> {f.path}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               );
