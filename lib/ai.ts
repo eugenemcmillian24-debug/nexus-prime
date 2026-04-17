@@ -144,6 +144,27 @@ export class NexusOrchestrator {
         result: { reasoning, plan, code: finalCode, visualAnalysis }
       }).eq('id', jobId);
 
+      // Point 3: Auto-sync AI-generated code into project files
+      if (job.project_id && finalCode?.files) {
+        for (const file of finalCode.files) {
+          const ext = file.path.split(".").pop()?.toLowerCase();
+          const langMap: Record<string, string> = {
+            ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+            css: "css", scss: "scss", html: "html", json: "json", md: "markdown", sql: "sql",
+          };
+          const language = langMap[ext || ""] || "plaintext";
+
+          await this.supabase.from('project_files').upsert({
+            project_id: job.project_id,
+            path: file.path,
+            content: file.content,
+            language,
+            size_bytes: Buffer.from(file.content || "").length,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'project_id,path' });
+        }
+      }
+
     } catch (err: any) {
       await this.logEvent(jobId, 'system', 'error', err.message);
       await this.supabase.from('agent_jobs').update({ status: 'failed', error: err.message }).eq('id', jobId);

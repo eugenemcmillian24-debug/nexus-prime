@@ -76,14 +76,16 @@ interface AppLayoutProps {
   userId: string;
   projectId: string;
   projectName: string;
+  initialVersion?: number;
 }
 
-export default function AppLayout({ userId, projectId, projectName }: AppLayoutProps) {
+export default function AppLayout({ userId, projectId, projectName, initialVersion = 1 }: AppLayoutProps) {
   const [activeView, setActiveView] = useState("editor");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeFiles, setActiveFiles] = useState<AppFile[]>([]);
   const [currentFile, setCurrentFile] = useState<AppFile | null>(null);
   const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab">("none");
+  const [currentVersion, setCurrentVersion] = useState(initialVersion);
 
   const handleFileSelect = useCallback((file: AppFile) => {
     setCurrentFile(file);
@@ -171,10 +173,23 @@ export default function AppLayout({ userId, projectId, projectName }: AppLayoutP
                 {rightPanel === "versions" && (
                   <VersionControl
                     projectId={projectId}
-                    projectName={projectName}
-                    currentVersion={1}
+                    userId={userId}
                     onRollback={async (version: number) => {
-                      console.log("Rollback to version", version);
+                      try {
+                        const res = await fetch("/api/versions", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ project_id: projectId, version_number: version }),
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          setCurrentVersion(data.new_version);
+                          // Refresh files if needed, or just reload page
+                          window.location.reload();
+                        }
+                      } catch (err) {
+                        console.error("Rollback failed:", err);
+                      }
                     }}
                   />
                 )}
@@ -182,7 +197,7 @@ export default function AppLayout({ userId, projectId, projectName }: AppLayoutP
                   <DeploymentPipeline
                     projectId={projectId}
                     projectName={projectName}
-                    currentVersion={1}
+                    currentVersion={currentVersion}
                   />
                 )}
                 {rightPanel === "collab" && (
@@ -201,10 +216,22 @@ export default function AppLayout({ userId, projectId, projectName }: AppLayoutP
         return (
           <VersionControl
             projectId={projectId}
-            projectName={projectName}
-            currentVersion={1}
+            userId={userId}
             onRollback={async (version: number) => {
-              console.log("Rollback to version", version);
+              try {
+                const res = await fetch("/api/versions", {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ project_id: projectId, version_number: version }),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  setCurrentVersion(data.new_version);
+                  window.location.reload();
+                }
+              } catch (err) {
+                console.error("Rollback failed:", err);
+              }
             }}
           />
         );
@@ -213,7 +240,7 @@ export default function AppLayout({ userId, projectId, projectName }: AppLayoutP
           <DeploymentPipeline
             projectId={projectId}
             projectName={projectName}
-            currentVersion={1}
+            currentVersion={currentVersion}
           />
         );
       case "templates":
