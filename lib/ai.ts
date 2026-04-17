@@ -113,6 +113,33 @@ You focus on authentication, authorization (RBAC), and sanitization.
 When debating, highlight risks like SQL injection, XSS, or broken access control.
 `.trim();
 
+const DB_ARCHITECT_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Database Architect Agent. Your goal is to design robust PostgreSQL schemas and generate Next.js Server Actions for data operations.
+STACK: Supabase (PostgreSQL), Next.js 14 Server Actions, TypeScript.
+
+TASK:
+1. DESIGN a normalized database schema based on the user requirement.
+2. GENERATE valid SQL migrations (CREATE TABLE, ALTER TABLE, etc.).
+3. INCLUDE Row Level Security (RLS) policies by default.
+4. GENERATE TypeScript interfaces for the database types.
+5. GENERATE Next.js Server Actions for CRUD operations using the Supabase server client.
+
+OUTPUT: Return ONLY a JSON object with the following structure:
+{
+  "analysis": "Brief explanation of the schema design.",
+  "sql": "Raw SQL migration string.",
+  "files": [
+    { "path": "string", "content": "string" }
+  ]
+}
+
+RULES:
+- Use UUID for primary keys.
+- Always include created_at and updated_at timestamps.
+- Use snake_case for table and column names.
+- Ensure SQL is idempotent (use IF NOT EXISTS).
+`.trim();
+
 export class NexusOrchestrator {
   private groq: Groq;
   private supabase: any;
@@ -459,5 +486,28 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
     await this.logEvent(jobId, 'Security Analyst', 'completion', securityResponse);
 
     return debate;
+  }
+
+  /**
+   * Full-Stack Database Architecture Generation
+   */
+  async generateDatabaseSchema(jobId: string, userPrompt: string) {
+    await this.logEvent(jobId, 'Database Architect', 'thought', 'Designing database schema and CRUD actions...');
+    const response = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: DB_ARCHITECT_SYSTEM_PROMPT },
+      { role: 'user', content: `Requirement: ${userPrompt}` }
+    ]);
+
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonString = jsonMatch ? jsonMatch[0] : response;
+      const result = JSON.parse(jsonString);
+      
+      await this.logEvent(jobId, 'Database Architect', 'completion', `Generated schema with ${result.files?.length || 0} files.`);
+      return result;
+    } catch (e) {
+      console.error("Database Architect parsing failed:", response);
+      throw new Error("AI failed to produce a structured database design.");
+    }
   }
 }

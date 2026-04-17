@@ -27,6 +27,7 @@ const WebhooksApiAccess = dynamic(() => import("@/components/features/WebhooksAp
 const ExportToGitHub = dynamic(() => import("@/components/features/ExportToGitHub"), { ssr: false });
 const FigmaImport = dynamic(() => import("@/components/features/FigmaImport"), { ssr: false });
 const WarRoom = dynamic(() => import("@/components/features/WarRoom"), { ssr: false });
+const DatabaseArchitect = dynamic(() => import("@/components/features/DatabaseArchitect"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -42,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "editor", label: "Editor", icon: "✏️", section: "build" },
   { id: "versions", label: "Versions", icon: "📸", section: "build" },
   { id: "deploy", label: "Deploy", icon: "🚀", section: "build" },
+  { id: "database", label: "Database", icon: "🗄️", section: "build", badge: "BETA" },
   // AI
   { id: "templates", label: "Templates", icon: "📋", section: "ai" },
   { id: "models", label: "Models", icon: "🧠", section: "ai" },
@@ -252,6 +254,8 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
             currentVersion={currentVersion}
           />
         );
+      case "database":
+        return <DatabaseArchitect projectId={projectId} onGenerationComplete={() => {}} />;
       case "templates":
         return <PromptTemplates />;
       case "models":
