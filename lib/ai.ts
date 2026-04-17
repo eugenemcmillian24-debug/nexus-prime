@@ -95,6 +95,24 @@ RULES:
 - Export components as default.
 `.trim();
 
+const ARCHITECT_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Architect Agent. Your goal is to design the high-level system architecture, database schema, and API routing.
+You focus on scalability, maintainability, and clean code principles.
+When debating, provide concrete technical reasons for your decisions.
+`.trim();
+
+const UI_DESIGNER_SYSTEM_PROMPT = `
+You are the NEXUS PRIME UI/UX Designer Agent. Your goal is to ensure the user interface is beautiful, accessible, and follows modern design tokens.
+You focus on Tailwind CSS, animations, and user flow.
+When debating, advocate for the best user experience and visual consistency.
+`.trim();
+
+const SECURITY_ANALYST_PROMPT = `
+You are the NEXUS PRIME Security Analyst Agent. Your goal is to identify potential vulnerabilities and ensure data protection.
+You focus on authentication, authorization (RBAC), and sanitization.
+When debating, highlight risks like SQL injection, XSS, or broken access control.
+`.trim();
+
 export class NexusOrchestrator {
   private groq: Groq;
   private supabase: any;
@@ -405,5 +423,41 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
     }
 
     return { files: results };
+  }
+
+  /**
+   * War Room Multi-Agent Debate
+   */
+  async conductWarRoomDebate(jobId: string, userPrompt: string) {
+    const debate: any[] = [];
+
+    // 1. Architect's Perspective
+    await this.logEvent(jobId, 'Architect', 'thought', 'Designing system architecture...');
+    const architectResponse = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: ARCHITECT_SYSTEM_PROMPT },
+      { role: 'user', content: `Design a high-level architecture for this request: ${userPrompt}` }
+    ]);
+    debate.push({ agent: 'Architect', content: architectResponse });
+    await this.logEvent(jobId, 'Architect', 'completion', architectResponse);
+
+    // 2. UI/UX Designer's Perspective (Contextualized)
+    await this.logEvent(jobId, 'UI/UX Designer', 'thought', 'Refining user interface and flow...');
+    const uiDesignerResponse = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: UI_DESIGNER_SYSTEM_PROMPT },
+      { role: 'user', content: `User Request: ${userPrompt}\n\nArchitect's Proposal: ${architectResponse}\n\nHow should we design the UI to match this architecture?` }
+    ]);
+    debate.push({ agent: 'UI/UX Designer', content: uiDesignerResponse });
+    await this.logEvent(jobId, 'UI/UX Designer', 'completion', uiDesignerResponse);
+
+    // 3. Security Analyst's Perspective
+    await this.logEvent(jobId, 'Security Analyst', 'thought', 'Auditing the proposal for vulnerabilities...');
+    const securityResponse = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: SECURITY_ANALYST_PROMPT },
+      { role: 'user', content: `User Request: ${userPrompt}\n\nArchitect's Proposal: ${architectResponse}\n\nUI Proposal: ${uiDesignerResponse}\n\nIdentify potential security risks.` }
+    ]);
+    debate.push({ agent: 'Security Analyst', content: securityResponse });
+    await this.logEvent(jobId, 'Security Analyst', 'completion', securityResponse);
+
+    return debate;
   }
 }

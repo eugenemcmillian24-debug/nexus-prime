@@ -26,6 +26,7 @@ const CustomDomains = dynamic(() => import("@/components/features/CustomDomains"
 const WebhooksApiAccess = dynamic(() => import("@/components/features/WebhooksApiAccess"), { ssr: false });
 const ExportToGitHub = dynamic(() => import("@/components/features/ExportToGitHub"), { ssr: false });
 const FigmaImport = dynamic(() => import("@/components/features/FigmaImport"), { ssr: false });
+const WarRoom = dynamic(() => import("@/components/features/WarRoom"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -48,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "history", label: "Prompt History", icon: "📜", section: "ai" },
   { id: "suggestions", label: "AI Suggestions", icon: "🧠", section: "ai" },
   { id: "marketplace", label: "Marketplace", icon: "🏪", section: "ai" },
+  { id: "war-room", label: "War Room", icon: "⚔️", section: "ai", badge: "LIVE" },
   { id: "figma", label: "Figma Sync", icon: "🎨", section: "ai", badge: "NEW" },
   { id: "components", label: "Components", icon: "🧩", section: "ai" },
   // Platform
@@ -86,7 +88,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeFiles, setActiveFiles] = useState<AppFile[]>([]);
   const [currentFile, setCurrentFile] = useState<AppFile | null>(null);
-  const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab">("none");
+  const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab" | "war-room">("none");
   const [currentVersion, setCurrentVersion] = useState(initialVersion);
 
   const handleFileSelect = useCallback((file: AppFile) => {
@@ -107,7 +109,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
     });
   }, [currentFile]);
 
-  const toggleRightPanel = (panel: "review" | "versions" | "deploy" | "collab") => {
+  const toggleRightPanel = (panel: "review" | "versions" | "deploy" | "collab" | "war-room") => {
     setRightPanel((prev) => (prev === panel ? "none" : panel));
   };
 
@@ -210,6 +212,11 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                     currentFile={currentFile?.path}
                   />
                 )}
+                {rightPanel === "war-room" && (
+                  <WarRoom
+                    projectId={projectId}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -271,6 +278,8 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
         return <PromptHistory projectId={projectId} onReplayPrompt={(prompt, model) => { setActiveView("editor"); }} />;
       case "marketplace":
         return <TemplateMarketplace userId={userId} />;
+      case "war-room":
+        return <WarRoom projectId={projectId} />;
       case "figma":
         return <FigmaImport projectId={projectId} onImportComplete={() => setActiveView("editor")} />;
       case "suggestions":
@@ -419,6 +428,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                   { panel: "review" as const, icon: "🔍", label: "Review" },
                   { panel: "versions" as const, icon: "📸", label: "Versions" },
                   { panel: "deploy" as const, icon: "🚀", label: "Deploy" },
+                  { panel: "war-room" as const, icon: "⚔️", label: "War Room" },
                   { panel: "collab" as const, icon: "👥", label: "Live" },
                 ] as const).map(({ panel, icon, label }) => (
                   <button
