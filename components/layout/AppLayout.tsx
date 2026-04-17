@@ -24,7 +24,7 @@ const TemplateMarketplace = dynamic(() => import("@/components/features/Template
 const ContextAwareSuggestions = dynamic(() => import("@/components/features/ContextAwareSuggestions"), { ssr: false });
 const CustomDomains = dynamic(() => import("@/components/features/CustomDomains"), { ssr: false });
 const WebhooksApiAccess = dynamic(() => import("@/components/features/WebhooksApiAccess"), { ssr: false });
-const ExportToGitHub = dynamic(() => import("@/components/features/ExportToGitHub"), { ssr: false });
+const MultiPlatformExport = dynamic(() => import("@/components/features/MultiPlatformExport"), { ssr: false });
 const FigmaImport = dynamic(() => import("@/components/features/FigmaImport"), { ssr: false });
 const WarRoom = dynamic(() => import("@/components/features/WarRoom"), { ssr: false });
 const DatabaseArchitect = dynamic(() => import("@/components/features/DatabaseArchitect"), { ssr: false });
@@ -64,7 +64,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "team", label: "Team", icon: "👥", section: "platform" },
   { id: "domains", label: "Domains", icon: "🌐", section: "platform" },
   { id: "webhooks", label: "Webhooks & API", icon: "🔌", section: "platform" },
-  { id: "export", label: "Export to GitHub", icon: "📤", section: "platform" },
+  { id: "export", label: "Cloud Export Engine", icon: "📤", section: "platform", badge: "NEW" },
   { id: "keys", label: "API Keys", icon: "🔑", section: "platform" },
   { id: "notifications", label: "Notifications", icon: "🔔", section: "platform" },
   { id: "settings", label: "Settings", icon: "⚙️", section: "platform" },
@@ -328,7 +328,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
       case "webhooks":
         return <WebhooksApiAccess projectId={projectId} />;
       case "export":
-        return <ExportToGitHub projectId={projectId} projectName={projectName} />;
+        return <MultiPlatformExport projectId={projectId} projectName={projectName} />;
       case "notifications":
         return <NotificationCenter userId={userId} />;
       case "settings":
