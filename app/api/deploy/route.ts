@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/api';
 import { NexusOrchestrator } from '@/lib/ai';
 import { z, ZodError } from 'zod';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const DeploySchema = z.object({
   jobId: z.string().uuid('Invalid job ID format'),
@@ -16,10 +11,16 @@ const DeploySchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = user.id;
+
     const body = await req.json();
 
     // 1. INPUT VALIDATION (Zod Hardening)
-    const { jobId, projectName, userId } = DeploySchema.parse(body);
+    // We ensure the userId used is the authenticated one
+    const { jobId, projectName } = DeploySchema.parse({ ...body, userId: user.id });
 
     // 2. Fetch Job Result
     const { data: job, error: jobError } = await supabase

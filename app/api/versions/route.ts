@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { createClient } from "@/lib/supabase/api";
 
 // GET /api/versions?project_id=xxx - List versions for a project
 export async function GET(req: NextRequest) {
-  const userId = req.headers.get("x-user-id");
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = user.id;
 
   const { searchParams } = new URL(req.url);
   const projectId = searchParams.get("project_id");
@@ -56,8 +53,10 @@ export async function GET(req: NextRequest) {
 
 // POST /api/versions - Create a new version (snapshot current files)
 export async function POST(req: NextRequest) {
-  const userId = req.headers.get("x-user-id");
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = user.id;
 
   const body = await req.json();
   const { project_id, message } = body;
@@ -138,8 +137,10 @@ export async function POST(req: NextRequest) {
 
 // PUT /api/versions - Rollback to a specific version
 export async function PUT(req: NextRequest) {
-  const userId = req.headers.get("x-user-id");
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = user.id;
 
   const body = await req.json();
   const { project_id, version_number } = body;

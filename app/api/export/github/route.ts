@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const ExportSchema = z.object({
   userId: z.string().uuid(),
@@ -25,8 +20,13 @@ const ExportSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = user.id;
+
     const body = await req.json();
-    const { userId, repoName, files, isPrivate } = ExportSchema.parse(body);
+    const { repoName, files, isPrivate } = ExportSchema.parse({ ...body, userId: user.id });
 
     // Verify user exists
     const { data: profile } = await supabase

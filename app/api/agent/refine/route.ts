@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
 import { Groq } from "groq-sdk";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
 
 const RefineSchema = z.object({
   userId: z.string().uuid(),
@@ -33,9 +26,17 @@ export const maxDuration = 120;
 
 export async function POST(req: Request) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = user.id;
+
     const body = await req.json();
-    const { userId, parentJobId, refinementPrompt, currentCode } =
-      RefineSchema.parse(body);
+    const { parentJobId, refinementPrompt, currentCode } =
+      RefineSchema.parse({ ...body, userId: user.id });
+
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
+
 
     // Verify user owns the parent job
     const { data: parentJob } = await supabase

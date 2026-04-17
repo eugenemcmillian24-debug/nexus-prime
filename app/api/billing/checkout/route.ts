@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { createClient } from '@/lib/supabase/api';
 import { CheckoutSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
 
@@ -9,10 +10,17 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(req: Request) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = user.id;
+
     const body = await req.json();
-    
+
     // 1. INPUT VALIDATION (Zod Hardening)
-    const { userId, tier } = CheckoutSchema.parse(body);
+    // We ensure the userId used is the authenticated one
+    const { tier } = CheckoutSchema.parse({ ...body, userId: user.id });
+
 
     // NEXUS PRIME Pricing Model:
     // Starter: $9/mo (100 credits)

@@ -1,23 +1,28 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/api';
 import { NexusOrchestrator } from '@/lib/ai';
 import { AgentJobSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
 import { waitUntil } from '@vercel/functions';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export const maxDuration = 300; // 5 min max for orchestrator pipeline
 
 export async function POST(req: Request) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = user.id;
+
     const body = await req.json();
-    
+
     // 1. INPUT VALIDATION (Zod Hardening)
-    const { prompt, userId, imageUrl, projectId } = AgentJobSchema.parse(body);
+    // We ensure the userId used is the authenticated one
+    const { prompt, imageUrl, projectId } = AgentJobSchema.parse({
+      ...body,
+      userId: user.id
+    });
+
 
     // 2. NEXUS GUARD: Atomic Credit Deduction
     const { data: result, error: rpcError } = await supabase.rpc('deduct_user_credits', {
