@@ -34,6 +34,9 @@ const VoiceStreamOverlay = dynamic(() => import("@/components/features/VoiceStre
 const SecurityShield = dynamic(() => import("@/components/features/SecurityShield"), { ssr: false });
 const TestGenerator = dynamic(() => import("@/components/features/TestGenerator"), { ssr: false });
 const PerformanceMonitor = dynamic(() => import("@/components/features/PerformanceMonitor"), { ssr: false });
+const DeploymentCommandCenter = dynamic(() => import("@/components/features/DeploymentCommandCenter"), { ssr: false });
+const MobileEmulator = dynamic(() => import("@/components/features/MobileEmulator"), { ssr: false });
+const CommunityTemplates = dynamic(() => import("@/components/features/CommunityTemplates"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -49,6 +52,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: "editor", label: "Editor", icon: "✏️", section: "build" },
   { id: "versions", label: "Versions", icon: "📸", section: "build" },
   { id: "deploy", label: "Deploy", icon: "🚀", section: "build" },
+  { id: "deploy-center", label: "Deployment Center", icon: "📊", section: "build", badge: "NEW" },
+  { id: "mobile-lab", label: "Mobile Emulator", icon: "📱", section: "build", badge: "NEW" },
   { id: "database", label: "Database", icon: "🗄️", section: "build", badge: "BETA" },
   { id: "docs", label: "Documentation", icon: "📚", section: "build" },
   // AI
@@ -58,6 +63,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "history", label: "Prompt History", icon: "📜", section: "ai" },
   { id: "suggestions", label: "AI Suggestions", icon: "🧠", section: "ai" },
   { id: "marketplace", label: "Marketplace", icon: "🏪", section: "ai" },
+  { id: "community", label: "Community Blueprints", icon: "🌍", section: "ai", badge: "NEW" },
   { id: "war-room", label: "War Room", icon: "⚔️", section: "ai", badge: "LIVE" },
   { id: "security", label: "Security Shield", icon: "🛡️", section: "ai", badge: "NEW" },
   { id: "tests", label: "AI Test Lab", icon: "🧪", section: "ai", badge: "NEW" },
@@ -146,6 +152,12 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
             onFileSelect={(file: { id: string; path: string; content: string; language: string }) => handleFileSelect(file)}
           />
         );
+      case "deploy-center":
+        return <DeploymentCommandCenter projectId={projectId} />;
+      case "mobile-lab":
+        return <MobileEmulator previewUrl="https://nexus-prime-preview.vercel.app" />;
+      case "community":
+        return <CommunityTemplates onFork={(template) => alert(`Forking ${template.name}...`)} />;
       case "editor":
         return (
           <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>

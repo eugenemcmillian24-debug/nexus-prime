@@ -219,6 +219,30 @@ OUTPUT FORMAT:
 Return ONLY the raw JSON object. No conversational filler.
 `.trim();
 
+const DEPLOYMENT_MONITOR_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Deployment Command Center Agent. Your goal is to analyze deployment logs and production health metrics.
+
+TASK:
+1. ANALYZE provided logs from Vercel/Netlify.
+2. IDENTIFY performance bottlenecks, runtime errors, or build warnings.
+3. PROVIDE actionable recommendations for optimization or fixing.
+
+OUTPUT FORMAT:
+{
+  "status": "healthy" | "warning" | "error",
+  "summary": "Short summary of the health state.",
+  "issues": [
+    { "type": "error" | "warning" | "performance", "message": "Description", "file": "path/to/file", "suggestion": "How to fix" }
+  ],
+  "metrics": {
+    "buildTime": "string",
+    "bundleSize": "string",
+    "errorRate": "string"
+  }
+}
+Return ONLY the raw JSON object. No conversational filler.
+`.trim();
+
 export class NexusOrchestrator {
   private groq: Groq;
   private supabase: any;
@@ -454,6 +478,24 @@ export class NexusOrchestrator {
    */
   async analyzePerformance(files: { path: string, content: string }[]) {
     // ... existing analyzePerformance ...
+  }
+
+  /**
+   * AI Deployment Health Analysis
+   */
+  async analyzeDeploymentHealth(logs: string) {
+    const response = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: DEPLOYMENT_MONITOR_SYSTEM_PROMPT },
+      { role: 'user', content: `Analyze these deployment logs:\n${logs}` }
+    ]);
+
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      return JSON.parse(jsonMatch ? jsonMatch[0] : response);
+    } catch (e) {
+      console.error('Deployment Analysis Error:', e);
+      return { status: 'error', summary: 'Failed to analyze logs.' };
+    }
   }
 
   /**
