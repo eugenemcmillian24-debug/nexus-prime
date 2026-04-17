@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/api";
 
 export async function GET(
   req: NextRequest,
@@ -24,7 +24,7 @@ export async function GET(
   
   // Try to find package.json for dependencies
   const packageJson = files.find(f => f.path === "package.json");
-  let dependencies = [];
+  let dependencies: string[] = [];
   if (packageJson) {
     try {
       const parsed = JSON.parse(packageJson.content);
