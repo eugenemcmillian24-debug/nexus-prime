@@ -493,8 +493,8 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
                                 {item.user?.displayName || item.user?.email || "Someone"}
                               </strong>{" "}
                               <span style={{ color: "#737373" }}>{actionConfig.label}</span>
-                              {item.metadata?.projectName && (
-                                <span style={{ color: "#a5b4fc" }}> in {String(item.metadata.projectName)}</span>
+                              {(item.metadata as any)?.projectName && (
+                                <span style={{ color: "#a5b4fc" }}> in {String((item.metadata as any).projectName)}</span>
                               )}
                             </span>
                             <div style={{ fontSize: "11px", color: "#525252", marginTop: "2px" }}>
