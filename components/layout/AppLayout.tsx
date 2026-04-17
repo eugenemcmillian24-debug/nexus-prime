@@ -29,6 +29,7 @@ const FigmaImport = dynamic(() => import("@/components/features/FigmaImport"), {
 const WarRoom = dynamic(() => import("@/components/features/WarRoom"), { ssr: false });
 const DatabaseArchitect = dynamic(() => import("@/components/features/DatabaseArchitect"), { ssr: false });
 const DocumentationLab = dynamic(() => import("@/components/features/DocumentationLab"), { ssr: false });
+const VoiceStreamOverlay = dynamic(() => import("@/components/features/VoiceStreamOverlay"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -94,6 +95,18 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
   const [currentFile, setCurrentFile] = useState<AppFile | null>(null);
   const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab" | "war-room">("none");
   const [currentVersion, setCurrentVersion] = useState(initialVersion);
+  const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
+
+  // Global "V" hotkey for voice command
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "v" && !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement).tagName)) {
+        setShowVoiceOverlay(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const handleFileSelect = useCallback((file: AppFile) => {
     setCurrentFile(file);
@@ -313,6 +326,24 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
     <div style={{ display: "flex", height: "100vh", background: "#0a0a0a", color: "#e5e5e5", overflow: "hidden" }}>
       {/* Command Palette (global) */}
       <CommandPalette />
+
+      {/* Voice Stream Overlay (global) */}
+      {showVoiceOverlay && (
+        <VoiceStreamOverlay
+          projectId={projectId}
+          currentFile={currentFile ? { path: currentFile.path, content: currentFile.content } : null}
+          onCodeApplied={(newCode) => {
+            if (currentFile) {
+              const updated = { ...currentFile, content: newCode };
+              setCurrentFile(updated);
+              setActiveFiles((prev) =>
+                prev.map((f) => (f.id === currentFile.id ? updated : f))
+              );
+            }
+          }}
+          onClose={() => setShowVoiceOverlay(false)}
+        />
+      )}
 
       {/* Sidebar */}
       <aside

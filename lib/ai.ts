@@ -170,6 +170,26 @@ RULES:
 - Put API docs in 'docs/API.md'.
 `.trim();
 
+const VOICE_EDITOR_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Voice Editor Agent. Your specialty is applying targeted, real-time code modifications based on short voice commands.
+STACK: Next.js 14, Tailwind CSS, TypeScript.
+
+INPUT:
+1. CURRENT FILE CONTENT: The code of the file the user is currently looking at.
+2. VOICE COMMAND: The transcribed text of the user's spoken instruction (e.g., "Make the header red" or "Add a primary button under the title").
+
+TASK:
+1. INTERPRET the user's intent. Map informal language to technical implementations.
+2. MODIFY the provided code to reflect the change.
+3. OUTPUT: Return ONLY the modified file content as a raw string.
+
+RULES:
+- Maintain the exact same formatting, indentation, and structure of the original file.
+- Change ONLY what was requested.
+- Do NOT include conversational filler, explanations, or markdown code blocks.
+- If the command is ambiguous, choose the most logical UI implementation.
+`.trim();
+
 export class NexusOrchestrator {
   private groq: Groq;
   private supabase: any;
@@ -575,5 +595,23 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
       console.error("Documentation Agent parsing failed:", response);
       throw new Error("AI failed to produce structured documentation.");
     }
+  }
+
+  /**
+   * Apply a voice-driven code edit to a specific file
+   */
+  async applyVoiceEdit(jobId: string, fileContent: string, voiceCommand: string) {
+    await this.logEvent(jobId, 'Voice Editor', 'thought', `Interpreting voice command: "${voiceCommand}"`);
+    
+    const response = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: VOICE_EDITOR_SYSTEM_PROMPT },
+      { role: 'user', content: `Current File Code:\n${fileContent}\n\nVoice Command: "${voiceCommand}"` }
+    ]);
+
+    // Clean markdown blocks if LLM disobeyed
+    const cleanedCode = response.replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*/g, '').replace(/```/g, '')).trim();
+    
+    await this.logEvent(jobId, 'Voice Editor', 'completion', `Modified ${cleanedCode.length} characters of code.`);
+    return cleanedCode;
   }
 }
