@@ -30,6 +30,7 @@ const WarRoom = dynamic(() => import("@/components/features/WarRoom"), { ssr: fa
 const DatabaseArchitect = dynamic(() => import("@/components/features/DatabaseArchitect"), { ssr: false });
 const DocumentationLab = dynamic(() => import("@/components/features/DocumentationLab"), { ssr: false });
 const VoiceStreamOverlay = dynamic(() => import("@/components/features/VoiceStreamOverlay"), { ssr: false });
+const SecurityShield = dynamic(() => import("@/components/features/SecurityShield"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -55,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "suggestions", label: "AI Suggestions", icon: "🧠", section: "ai" },
   { id: "marketplace", label: "Marketplace", icon: "🏪", section: "ai" },
   { id: "war-room", label: "War Room", icon: "⚔️", section: "ai", badge: "LIVE" },
+  { id: "security", label: "Security Shield", icon: "🛡️", section: "ai", badge: "NEW" },
   { id: "figma", label: "Figma Sync", icon: "🎨", section: "ai", badge: "NEW" },
   { id: "components", label: "Components", icon: "🧩", section: "ai" },
   // Platform
@@ -93,7 +95,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeFiles, setActiveFiles] = useState<AppFile[]>([]);
   const [currentFile, setCurrentFile] = useState<AppFile | null>(null);
-  const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab" | "war-room">("none");
+  const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab" | "war-room" | "security">("none");
   const [currentVersion, setCurrentVersion] = useState(initialVersion);
   const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
 
@@ -126,7 +128,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
     });
   }, [currentFile]);
 
-  const toggleRightPanel = (panel: "review" | "versions" | "deploy" | "collab" | "war-room") => {
+  const toggleRightPanel = (panel: "review" | "versions" | "deploy" | "collab" | "war-room" | "security") => {
     setRightPanel((prev) => (prev === panel ? "none" : panel));
   };
 
@@ -234,6 +236,20 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                     projectId={projectId}
                   />
                 )}
+                {rightPanel === "security" && (
+                  <SecurityShield 
+                    projectId={projectId} 
+                    onFixApplied={(filePath, newCode) => {
+                      if (currentFile?.path === filePath) {
+                        const updated = { ...currentFile, content: newCode };
+                        setCurrentFile(updated);
+                        setActiveFiles((prev) =>
+                          prev.map((f) => (f.id === currentFile.id ? updated : f))
+                        );
+                      }
+                    }}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -301,6 +317,8 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
         return <TemplateMarketplace userId={userId} />;
       case "war-room":
         return <WarRoom projectId={projectId} />;
+      case "security":
+        return <SecurityShield projectId={projectId} />;
       case "figma":
         return <FigmaImport projectId={projectId} onImportComplete={() => setActiveView("editor")} />;
       case "suggestions":

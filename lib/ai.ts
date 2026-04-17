@@ -190,6 +190,33 @@ RULES:
 - If the command is ambiguous, choose the most logical UI implementation.
 `.trim();
 
+const SHIELD_MODE_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Security Analyst (Shield-Mode). Your goal is to identify security vulnerabilities, compliance issues, and best practice violations in the provided codebase.
+
+AUDIT SCOPE:
+1. EXPOSED SECRETS: Hardcoded API keys, tokens, or passwords.
+2. INSECURE HEADERS: Missing or weak security headers in API routes.
+3. SQL INJECTION: Unsafe query building in Supabase/SQL calls.
+4. XSS/CSRF: Improper sanitization or missing protection.
+5. AUTHENTICATION: Weak session checks or improper middleware usage.
+6. COMPLIANCE: GDPR/CCPA data handling best practices.
+
+OUTPUT FORMAT:
+Return a JSON array of vulnerability objects:
+[
+  {
+    "id": "string",
+    "severity": "critical" | "high" | "medium" | "low",
+    "title": "string",
+    "description": "string",
+    "file": "string",
+    "line": number,
+    "recommendation": "string"
+  }
+]
+Return ONLY the JSON array. No conversational filler.
+`.trim();
+
 export class NexusOrchestrator {
   private groq: Groq;
   private supabase: any;
@@ -368,17 +395,37 @@ export class NexusOrchestrator {
   }
 
   async transcribe(file: File | Blob) {
+    // ... existing transcribe ...
+  }
+
+  /**
+   * Shield-Mode: Perform Security Audit
+   */
+  async performSecurityAudit(files: { path: string, content: string }[]) {
+    const auditResponse = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: SHIELD_MODE_SYSTEM_PROMPT },
+      { role: 'user', content: `Audit the following project files:\n${JSON.stringify(files)}` }
+    ]);
+
     try {
-      const transcription = await this.groq.audio.transcriptions.create({
-        file: file as any,
-        model: 'whisper-large-v3-turbo',
-        response_format: 'verbose_json',
-      });
-      return transcription.text;
-    } catch (e: any) {
-      console.error('Transcription Error:', e);
-      throw new Error(`Voice Synthesis Failed: ${e.message}`);
+      const jsonMatch = auditResponse.match(/\[[\s\S]*\]/);
+      return JSON.parse(jsonMatch ? jsonMatch[0] : auditResponse);
+    } catch (e) {
+      console.error('Audit Parse Error:', e);
+      return [];
     }
+  }
+
+  /**
+   * Shield-Mode: Fix Security Vulnerability
+   */
+  async fixSecurityVulnerability(file: { path: string, content: string }, vulnerability: any) {
+    const fixResponse = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: 'You are the NEXUS PRIME Security Fixer. Apply the recommended fix to the provided code while maintaining functionality.' },
+      { role: 'user', content: `File: ${file.path}\nContent: ${file.content}\nVulnerability: ${vulnerability.title}\nRecommendation: ${vulnerability.recommendation}\n\nReturn the ENTIRE updated file content only. No markdown.` }
+    ]);
+
+    return fixResponse.trim();
   }
 
   /**
