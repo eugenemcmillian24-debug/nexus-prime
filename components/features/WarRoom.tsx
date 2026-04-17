@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  Users, 
+import { createClient } from "@/lib/supabase/client";
+import {
+  Users,
+
   Send, 
   ShieldCheck, 
   Layout, 
@@ -46,6 +48,27 @@ export default function WarRoom({ projectId, onPlanConfirmed }: WarRoomProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const supabase = createClient();
+  const channelRef = useRef<any>(null);
+
+  useEffect(() => {
+    const channel = supabase.channel(`project:${projectId}`);
+    
+    channel
+      .on("broadcast", { event: "war-room-msg" }, ({ payload }) => {
+        setMessages(prev => [...prev, payload]);
+      })
+      .on("broadcast", { event: "war-room-status" }, ({ payload }) => {
+        setIsLoading(payload.isLoading);
+      })
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [projectId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -64,6 +87,18 @@ export default function WarRoom({ projectId, onPlanConfirmed }: WarRoomProps) {
     setInput("");
     setIsLoading(true);
 
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "war-room-msg",
+      payload: userMessage
+    });
+
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "war-room-status",
+      payload: { isLoading: true }
+    });
+
     try {
       const response = await fetch("/api/agent/war-room", {
         method: "POST",
@@ -75,18 +110,33 @@ export default function WarRoom({ projectId, onPlanConfirmed }: WarRoomProps) {
 
       const data = await response.json();
       setJobId(data.jobId);
-      
+
       const newMessages = data.debate.map((m: any) => ({
         ...m,
         timestamp: new Date().toISOString()
       }));
 
       setMessages((prev) => [...prev, ...newMessages]);
+
+      // Broadcast agents' responses
+      newMessages.forEach((msg: any) => {
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "war-room-msg",
+          payload: msg
+        });
+      });
     } catch (error) {
       console.error("War Room Error:", error);
     } finally {
       setIsLoading(false);
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "war-room-status",
+        payload: { isLoading: false }
+      });
     }
+
   };
 
   const clearHistory = () => {

@@ -232,11 +232,12 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                   <RealtimeCollab
                     projectId={projectId}
                     userId={userId}
-                    userName="You"
+                    userName={projectName.split(' ')[0] || "User"}
                     currentFile={currentFile?.path}
                   />
                 )}
                 {rightPanel === "war-room" && (
+
                   <WarRoom
                     projectId={projectId}
                   />

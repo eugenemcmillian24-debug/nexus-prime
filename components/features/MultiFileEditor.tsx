@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   Save,
   Play,
@@ -14,14 +14,6 @@ import {
   Settings2,
 } from "lucide-react";
 import FileExplorer from "./FileExplorer";
-
-const supabase =
-  typeof window !== "undefined" || process.env.NEXT_PUBLIC_SUPABASE_URL
-    ? createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder"
-      )
-    : (null as any);
 
 interface ProjectFile {
   id?: string;
@@ -95,6 +87,25 @@ export default function MultiFileEditor({
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
   const [loading, setLoading] = useState(true);
   const [unsavedChanges, setUnsavedChanges] = useState<Set<string>>(new Set());
+  const [collaborators, setCollaborators] = useState<any[]>([]);
+  const supabase = createClient();
+
+  // Presence logic
+  useEffect(() => {
+    const channel = supabase.channel(`project:${projectId}`);
+    
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState();
+        const users = Object.values(state).flat() as any[];
+        setCollaborators(users);
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [projectId]);
 
   // Load project files
   useEffect(() => {
@@ -264,7 +275,26 @@ export default function MultiFileEditor({
             Multi-File Editor
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          {/* Collaborators Stack */}
+          <div className="flex items-center -space-x-1.5 mr-2">
+            {collaborators.filter(c => c.id !== userId).slice(0, 5).map((collab) => (
+              <div 
+                key={collab.id}
+                className="w-5 h-5 rounded-full border-2 border-[#111] flex items-center justify-center text-[8px] font-bold text-white shadow-sm transition-transform hover:-translate-y-0.5 cursor-help"
+                style={{ background: collab.color }}
+                title={`${collab.name} is editing ${collab.activeFile || "nothing"}`}
+              >
+                {collab.name.charAt(0).toUpperCase()}
+              </div>
+            ))}
+            {collaborators.filter(c => c.id !== userId).length > 5 && (
+              <div className="w-5 h-5 rounded-full border-2 border-[#111] bg-[#222] flex items-center justify-center text-[7px] font-bold text-[#555]">
+                +{collaborators.length - 5}
+              </div>
+            )}
+          </div>
+
           {saveStatus === "saved" && (
             <span className="text-[10px] text-[#00ff88] flex items-center gap-1">
               <Check size={10} /> Saved
