@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/api";
 
 // GET /api/marketplace/templates?category=coding&sort=popular&q=react
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   const category = req.nextUrl.searchParams.get("category");
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch author profiles
-  const authorIds = [...new Set(data?.map((t) => t.author_id) || [])];
+  const authorIds = Array.from(new Set(data?.map((t) => t.author_id) || []));
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, full_name, avatar_url")
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/marketplace/templates - Publish a template
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
