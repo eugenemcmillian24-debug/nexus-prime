@@ -32,6 +32,7 @@ const DocumentationLab = dynamic(() => import("@/components/features/Documentati
 const VoiceStreamOverlay = dynamic(() => import("@/components/features/VoiceStreamOverlay"), { ssr: false });
 const SecurityShield = dynamic(() => import("@/components/features/SecurityShield"), { ssr: false });
 const TestGenerator = dynamic(() => import("@/components/features/TestGenerator"), { ssr: false });
+const PerformanceMonitor = dynamic(() => import("@/components/features/PerformanceMonitor"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -59,6 +60,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "war-room", label: "War Room", icon: "⚔️", section: "ai", badge: "LIVE" },
   { id: "security", label: "Security Shield", icon: "🛡️", section: "ai", badge: "NEW" },
   { id: "tests", label: "AI Test Lab", icon: "🧪", section: "ai", badge: "NEW" },
+  { id: "performance", label: "Performance", icon: "⚡", section: "ai", badge: "NEW" },
   { id: "figma", label: "Figma Sync", icon: "🎨", section: "ai", badge: "NEW" },
   { id: "components", label: "Components", icon: "🧩", section: "ai" },
   // Platform
@@ -97,7 +99,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeFiles, setActiveFiles] = useState<AppFile[]>([]);
   const [currentFile, setCurrentFile] = useState<AppFile | null>(null);
-  const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab" | "war-room" | "security" | "tests">("none");
+  const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab" | "war-room" | "security" | "tests" | "performance">("none");
   const [currentVersion, setCurrentVersion] = useState(initialVersion);
   const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
 
@@ -130,7 +132,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
     });
   }, [currentFile]);
 
-  const toggleRightPanel = (panel: "review" | "versions" | "deploy" | "collab" | "war-room" | "security" | "tests") => {
+  const toggleRightPanel = (panel: "review" | "versions" | "deploy" | "collab" | "war-room" | "security" | "tests" | "performance") => {
     setRightPanel((prev) => (prev === panel ? "none" : panel));
   };
 
@@ -255,6 +257,9 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                 {rightPanel === "tests" && (
                   <TestGenerator projectId={projectId} />
                 )}
+                {rightPanel === "performance" && (
+                  <PerformanceMonitor projectId={projectId} />
+                )}
               </div>
             )}
           </div>
@@ -326,6 +331,8 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
         return <SecurityShield projectId={projectId} />;
       case "tests":
         return <TestGenerator projectId={projectId} />;
+      case "performance":
+        return <PerformanceMonitor projectId={projectId} />;
       case "figma":
         return <FigmaImport projectId={projectId} onImportComplete={() => setActiveView("editor")} />;
       case "suggestions":

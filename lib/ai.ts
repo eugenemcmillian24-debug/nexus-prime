@@ -195,23 +195,34 @@ const SHIELD_MODE_SYSTEM_PROMPT = `
 `.trim();
 
 const TEST_GENERATOR_SYSTEM_PROMPT = `
-You are the NEXUS PRIME Test Engineer Agent. Your goal is to generate robust, high-coverage automated tests for the provided codebase.
-STACK: Jest, React Testing Library, Playwright.
+...
+`.trim();
 
-TASK:
-1. ANALYZE the provided code (components or API routes).
-2. GENERATE comprehensive test cases covering:
-   - Happy path scenarios.
-   - Edge cases and error handling.
-   - Mocking external dependencies (Supabase, API calls).
-3. ENSURE tests follow modern best practices (AAA pattern, descriptive names).
-4. OUTPUT: Return a JSON object:
-   {
-     "files": [
-       { "path": "string", "content": "string" }
-     ]
-   }
-Return ONLY the raw JSON string. No conversational filler.
+const PERFORMANCE_AGENT_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Performance Optimization Agent. Your goal is to identify performance bottlenecks, inefficient code patterns, and potential optimizations in the provided codebase.
+
+AUDIT SCOPE:
+1. RENDER OPTIMIZATION: Unnecessary re-renders, missing memoization.
+2. BUNDLE SIZE: Large dependencies, inefficient imports.
+3. API PERFORMANCE: N+1 queries, lack of caching, slow Server Actions.
+4. ASSET OPTIMIZATION: Unoptimized images, font loading issues.
+5. CODE EFFICIENCY: Algorithmic complexity, memory leaks.
+
+OUTPUT FORMAT:
+Return a JSON array of optimization objects:
+[
+  {
+    "id": "string",
+    "type": "render" | "bundle" | "api" | "asset" | "logic",
+    "impact": "critical" | "high" | "medium" | "low",
+    "title": "string",
+    "description": "string",
+    "file": "string",
+    "recommendation": "string",
+    "fix": "string" (optional code snippet)
+  }
+]
+Return ONLY the JSON array. No conversational filler.
 `.trim();
 
 export class NexusOrchestrator {
@@ -417,7 +428,12 @@ export class NexusOrchestrator {
    * Shield-Mode: Fix Security Vulnerability
    */
   async fixSecurityVulnerability(file: { path: string, content: string }, vulnerability: any) {
-    // ... existing fix ...
+    const fixResponse = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: 'You are the NEXUS PRIME Security Fixer. Apply the recommended fix to the provided code while maintaining functionality.' },
+      { role: 'user', content: `File: ${file.path}\nContent: ${file.content}\nVulnerability: ${vulnerability.title}\nRecommendation: ${vulnerability.recommendation}\n\nReturn the ENTIRE updated file content only. No markdown.` }
+    ]);
+
+    return fixResponse.trim();
   }
 
   /**
@@ -435,6 +451,24 @@ export class NexusOrchestrator {
       return data.files || [];
     } catch (e) {
       console.error('Test Generation Parse Error:', e);
+      return [];
+    }
+  }
+
+  /**
+   * AI Performance Analysis
+   */
+  async analyzePerformance(files: { path: string, content: string }[]) {
+    const response = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: PERFORMANCE_AGENT_SYSTEM_PROMPT },
+      { role: 'user', content: `Analyze the performance of these files:\n${JSON.stringify(files)}` }
+    ]);
+
+    try {
+      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      return JSON.parse(jsonMatch ? jsonMatch[0] : response);
+    } catch (e) {
+      console.error('Performance Analysis Parse Error:', e);
       return [];
     }
   }
