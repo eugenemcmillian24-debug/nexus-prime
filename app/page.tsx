@@ -8,7 +8,7 @@ import VoiceRecorder from "@/components/VoiceRecorder";
 import ScreenshotUpload from "@/components/ScreenshotUpload";
 import ProjectHistory from "@/components/ProjectHistory";
 import IterativeRefinement from "@/components/IterativeRefinement";
-import Login from "@/components/Login";
+import LandingPage from "@/components/LandingPage";
 import { createClient, User, AuthChangeEvent, Session, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { NEXUS_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/templates";
 import * as Icons from "lucide-react";
@@ -178,7 +178,7 @@ export default function Page() {
     </div>
   );
 
-  if (!user) return <Login />;
+  if (!user) return <LandingPage />;
 
   return (
     <div className="min-h-screen bg-[#050505] text-[#888] font-mono p-8 selection:bg-[#00ff8822] selection:text-[#00ff88]">
