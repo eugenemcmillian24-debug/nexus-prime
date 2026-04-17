@@ -4,6 +4,7 @@ import { NexusOrchestrator } from '@/lib/ai';
 import { AgentJobSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
 import { waitUntil } from '@vercel/functions';
+import { isNexusPrimeAdmin } from '@/lib/nexus_prime_access';
 
 export const maxDuration = 300; // 5 min max for orchestrator pipeline
 
@@ -25,16 +26,22 @@ export async function POST(req: Request) {
 
 
     // 2. NEXUS GUARD: Atomic Credit Deduction
-    const { data: result, error: rpcError } = await supabase.rpc('deduct_user_credits', {
-      target_user_id: userId,
-      amount_to_deduct: 10
-    });
+    const isAdmin = await isNexusPrimeAdmin();
+    let result = { success: true, new_balance: Infinity };
 
-    if (rpcError || !result.success) {
-      return NextResponse.json(
-        { error: result?.error || 'Credit verification failed. Please check your balance.' },
-        { status: 402 }
-      );
+    if (!isAdmin) {
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('deduct_user_credits', {
+        target_user_id: userId,
+        amount_to_deduct: 10
+      });
+      
+      if (rpcError || !rpcResult.success) {
+        return NextResponse.json(
+          { error: rpcResult?.error || 'Credit verification failed. Please check your balance.' },
+          { status: 402 }
+        );
+      }
+      result = rpcResult;
     }
 
     // 3. Create Job
@@ -53,11 +60,13 @@ export async function POST(req: Request) {
       .single();
 
     if (jobError) {
-      // Refund if job creation fails
-      await supabase.rpc('deduct_user_credits', {
-        target_user_id: userId,
-        amount_to_deduct: -10
-      });
+      // Refund if job creation fails (only if not admin)
+      if (!isAdmin) {
+        await supabase.rpc('deduct_user_credits', {
+          target_user_id: userId,
+          amount_to_deduct: -10
+        });
+      }
       throw jobError;
     }
 

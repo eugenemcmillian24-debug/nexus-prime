@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { createClient } from '@/lib/supabase/api';
 import { CheckoutSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
+import { isNexusPrimeAdmin } from '@/lib/nexus_prime_access';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16' as any,
@@ -20,6 +21,17 @@ export async function POST(req: Request) {
     // 1. INPUT VALIDATION (Zod Hardening)
     // We ensure the userId used is the authenticated one
     const { tier } = CheckoutSchema.parse({ ...body, userId: user.id });
+
+    // 2. CHECK ADMIN/SUPERUSER BYPASS
+    const isAdmin = await isNexusPrimeAdmin();
+    if (isAdmin) {
+      // For Admins, we don't create a Stripe session, just return a "Direct Upgrade"
+      // We can handle this logic in the frontend or just return a special URL
+      return NextResponse.json({ 
+        url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?status=admin_upgrade`,
+        message: 'Admin status detected. Unlimited build credits activated.'
+      });
+    }
 
 
     // NEXUS PRIME Pricing Model:

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { isNexusPrimeAdmin } from "@/lib/nexus_prime_access";
 
 // Lazy-load all feature components for code splitting
 const PromptTemplates = dynamic(() => import("@/components/features/PromptTemplates"), { ssr: false });
@@ -109,6 +110,11 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
   const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab" | "war-room" | "security" | "tests" | "performance">("none");
   const [currentVersion, setCurrentVersion] = useState(initialVersion);
   const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    isNexusPrimeAdmin().then(setIsAdmin);
+  }, []);
 
   // Global "V" hotkey for voice command
   React.useEffect(() => {
@@ -413,6 +419,19 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
               <span style={{ fontSize: "15px", fontWeight: 700, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 Nexus Prime
               </span>
+              {isAdmin && (
+                <span style={{
+                  fontSize: "9px",
+                  padding: "1px 4px",
+                  background: "#ef4444",
+                  color: "#fff",
+                  borderRadius: "4px",
+                  fontWeight: "bold",
+                  marginLeft: "4px"
+                }}>
+                  ADMIN
+                </span>
+              )}
             </Link>
           )}
           <button

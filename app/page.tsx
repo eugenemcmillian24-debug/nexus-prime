@@ -13,6 +13,7 @@ import { createClient, User, AuthChangeEvent, Session, RealtimePostgresChangesPa
 import { NEXUS_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/templates";
 import * as Icons from "lucide-react";
 import Link from "next/link";
+import { isNexusPrimeAdmin } from "@/lib/nexus_prime_access";
 
 const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
@@ -23,6 +24,7 @@ export default function Page() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [credits, setCredits] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -33,6 +35,10 @@ export default function Page() {
   const [showProjectHistory, setShowProjectHistory] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [templateCategory, setTemplateCategory] = useState("all");
+
+  useEffect(() => {
+    isNexusPrimeAdmin().then(setIsAdmin);
+  }, []);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -215,7 +221,7 @@ export default function Page() {
               [ Buy Credits ]
             </button>
             <div className="text-white font-bold">
-              {credits?.tier || 'Starter'}: {credits?.balance || 0} CR
+              {isAdmin ? 'ADMIN: ∞ CR' : `${credits?.tier || 'Starter'}: ${credits?.balance || 0} CR`}
             </div>
             <button 
               onClick={handleLogout}

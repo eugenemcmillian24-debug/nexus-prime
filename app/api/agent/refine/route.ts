@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
 import { Groq } from "groq-sdk";
+import { isNexusPrimeAdmin } from "@/lib/nexus_prime_access";
 
 const RefineSchema = z.object({
   userId: z.string().uuid(),
@@ -50,16 +51,22 @@ export async function POST(req: Request) {
     }
 
     // Deduct credits (refinement costs 5 credits)
-    const { data: creditResult, error: creditError } = await supabase.rpc(
-      "deduct_user_credits",
-      { target_user_id: userId, amount_to_deduct: 5 }
-    );
+    const isAdmin = await isNexusPrimeAdmin();
+    let creditResult = { success: true, new_balance: Infinity };
 
-    if (creditError || !creditResult?.success) {
-      return NextResponse.json(
-        { error: creditResult?.error || "Insufficient credits" },
-        { status: 402 }
+    if (!isAdmin) {
+      const { data: rpcResult, error: creditError } = await supabase.rpc(
+        "deduct_user_credits",
+        { target_user_id: userId, amount_to_deduct: 5 }
       );
+
+      if (creditError || !rpcResult?.success) {
+        return NextResponse.json(
+          { error: rpcResult?.error || "Insufficient credits" },
+          { status: 402 }
+        );
+      }
+      creditResult = rpcResult;
     }
 
     // Call refinement agent
