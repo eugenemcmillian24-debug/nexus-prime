@@ -41,7 +41,7 @@ export default function GalleryPage() {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
       setUser(session?.user ?? null);
     });
   }, []);

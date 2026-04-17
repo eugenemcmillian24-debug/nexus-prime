@@ -36,14 +36,14 @@ export default function Page() {
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } }: any = await supabase.auth.getSession();
       setUser(session?.user ?? null);
       setAuthLoading(false);
     };
 
     checkUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+    const { data: { subscription } }: any = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
     });
 
