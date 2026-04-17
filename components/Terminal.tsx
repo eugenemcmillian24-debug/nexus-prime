@@ -3,17 +3,19 @@
 import { useEffect, useState, useRef } from "react";
 import { createClient, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
-const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder"
-) : null as any;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+const supabase = (typeof window !== 'undefined' && supabaseUrl && supabaseKey) 
+  ? createClient(supabaseUrl, supabaseKey) 
+  : null;
 
 export default function Terminal({ jobId }: { jobId: string }) {
   const [events, setEvents] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase || !jobId) return;
 
     // 1. Fetch existing events
     const fetchEvents = async () => {
@@ -39,7 +41,9 @@ export default function Terminal({ jobId }: { jobId: string }) {
           filter: `job_id=eq.${jobId}`,
         },
         (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          setEvents((prev) => [...prev, payload.new]);
+          if (payload.new) {
+            setEvents((prev) => [...(prev || []), payload.new]);
+          }
         }
       )
       .subscribe();
@@ -65,11 +69,11 @@ export default function Terminal({ jobId }: { jobId: string }) {
       </div>
       
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
-        {events?.map((event, i) => (
+        {events && Array.isArray(events) && events.map((event, i) => (
           <div key={i} className="animate-in fade-in slide-in-from-left-2 duration-300">
-            <span className="text-[#00ff88] mr-2">[{(event?.agent_name || 'SYSTEM').split('-')[0].toUpperCase()}]</span>
-            <span className="text-[#888] mr-2">({event?.event_type}):</span>
-            <span className="text-white leading-relaxed">{event?.content}</span>
+            <span className="text-[#00ff88] mr-2">[{((event?.agent_name as string) || 'SYSTEM').split('-')[0].toUpperCase()}]</span>
+            <span className="text-[#888] mr-2">({event?.event_type || 'info'}):</span>
+            <span className="text-white leading-relaxed">{event?.content || ''}</span>
           </div>
         ))}
         {(!events || events.length === 0) && (
