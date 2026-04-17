@@ -9,11 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "14.2.3",
+    "next": "14.2.15",
     "react": "^18",
     "react-dom": "^18",
     "lucide-react": "^0.330.0",
-    "@supabase/supabase-js": "^2.39.7",
+    "@supabase/supabase-js": "^2.45.0",
     "@vercel/functions": "^1.4.0",
     "groq-sdk": "^0.3.0",
     "jszip": "^3.10.1",
