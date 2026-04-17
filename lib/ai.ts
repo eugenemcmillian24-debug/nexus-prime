@@ -191,30 +191,27 @@ RULES:
 `.trim();
 
 const SHIELD_MODE_SYSTEM_PROMPT = `
-You are the NEXUS PRIME Security Analyst (Shield-Mode). Your goal is to identify security vulnerabilities, compliance issues, and best practice violations in the provided codebase.
+...
+`.trim();
 
-AUDIT SCOPE:
-1. EXPOSED SECRETS: Hardcoded API keys, tokens, or passwords.
-2. INSECURE HEADERS: Missing or weak security headers in API routes.
-3. SQL INJECTION: Unsafe query building in Supabase/SQL calls.
-4. XSS/CSRF: Improper sanitization or missing protection.
-5. AUTHENTICATION: Weak session checks or improper middleware usage.
-6. COMPLIANCE: GDPR/CCPA data handling best practices.
+const TEST_GENERATOR_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Test Engineer Agent. Your goal is to generate robust, high-coverage automated tests for the provided codebase.
+STACK: Jest, React Testing Library, Playwright.
 
-OUTPUT FORMAT:
-Return a JSON array of vulnerability objects:
-[
-  {
-    "id": "string",
-    "severity": "critical" | "high" | "medium" | "low",
-    "title": "string",
-    "description": "string",
-    "file": "string",
-    "line": number,
-    "recommendation": "string"
-  }
-]
-Return ONLY the JSON array. No conversational filler.
+TASK:
+1. ANALYZE the provided code (components or API routes).
+2. GENERATE comprehensive test cases covering:
+   - Happy path scenarios.
+   - Edge cases and error handling.
+   - Mocking external dependencies (Supabase, API calls).
+3. ENSURE tests follow modern best practices (AAA pattern, descriptive names).
+4. OUTPUT: Return a JSON object:
+   {
+     "files": [
+       { "path": "string", "content": "string" }
+     ]
+   }
+Return ONLY the raw JSON string. No conversational filler.
 `.trim();
 
 export class NexusOrchestrator {
@@ -420,12 +417,26 @@ export class NexusOrchestrator {
    * Shield-Mode: Fix Security Vulnerability
    */
   async fixSecurityVulnerability(file: { path: string, content: string }, vulnerability: any) {
-    const fixResponse = await this.callGroq('llama-3.3-70b-versatile', [
-      { role: 'system', content: 'You are the NEXUS PRIME Security Fixer. Apply the recommended fix to the provided code while maintaining functionality.' },
-      { role: 'user', content: `File: ${file.path}\nContent: ${file.content}\nVulnerability: ${vulnerability.title}\nRecommendation: ${vulnerability.recommendation}\n\nReturn the ENTIRE updated file content only. No markdown.` }
+    // ... existing fix ...
+  }
+
+  /**
+   * AI Test Generation
+   */
+  async generateTests(files: { path: string, content: string }[]) {
+    const response = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: TEST_GENERATOR_SYSTEM_PROMPT },
+      { role: 'user', content: `Generate tests for these files:\n${JSON.stringify(files)}` }
     ]);
 
-    return fixResponse.trim();
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const data = JSON.parse(jsonMatch ? jsonMatch[0] : response);
+      return data.files || [];
+    } catch (e) {
+      console.error('Test Generation Parse Error:', e);
+      return [];
+    }
   }
 
   /**
