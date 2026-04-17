@@ -444,7 +444,7 @@ export default function DeploymentPipeline({
                         }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
                             <div>
-                              <div style={{ fontSize: "12px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", tracking: "0.1em" }}>
+                              <div style={{ fontSize: "12px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>
                                 AI Healing Analysis
                               </div>
                               <p style={{ fontSize: "11px", color: "#e5e5e5", marginTop: "4px", lineHeight: "1.4" }}>
