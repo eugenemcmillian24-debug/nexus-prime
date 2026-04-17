@@ -140,6 +140,36 @@ RULES:
 - Ensure SQL is idempotent (use IF NOT EXISTS).
 `.trim();
 
+const DOCUMENTATION_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Documentation Agent. Your goal is to generate professional, comprehensive documentation for a project.
+STACK: Markdown, OpenAPI/Swagger.
+
+TASK:
+1. ANALYZE the project files and structure.
+2. GENERATE a detailed README.md including:
+   - Project Title & Description.
+   - Installation & Setup instructions.
+   - Core Features list.
+   - Usage examples.
+3. GENERATE API Documentation for Server Actions or API routes.
+4. GENERATE Component Documentation (Component Lab) for UI components, including prop definitions and usage.
+
+OUTPUT: Return ONLY a JSON object with the following structure:
+{
+  "files": [
+    { "path": "string", "content": "string" }
+  ],
+  "components": [
+    { "name": "string", "description": "string", "props": "string", "usage": "string" }
+  ]
+}
+
+RULES:
+- Use clear, technical English.
+- Use Markdown formatting for files.
+- Put API docs in 'docs/API.md'.
+`.trim();
+
 export class NexusOrchestrator {
   private groq: Groq;
   private supabase: any;
@@ -508,6 +538,42 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
     } catch (e) {
       console.error("Database Architect parsing failed:", response);
       throw new Error("AI failed to produce a structured database design.");
+    }
+  }
+
+  /**
+   * Generate project documentation and component lab data
+   */
+  async generateDocumentation(jobId: string, projectId: string) {
+    // 1. Fetch project files
+    const { data: files } = await this.supabase
+      .from('project_files')
+      .select('path, content')
+      .eq('project_id', projectId);
+
+    if (!files || files.length === 0) throw new Error("No files found for documentation.");
+
+    await this.logEvent(jobId, 'Documentation Agent', 'thought', 'Analyzing project structure for documentation...');
+    
+    // We send a summary of files and some sample content to save tokens
+    const fileSummary = files.map((f: any) => f.path).join('\n');
+    const sampleContent = files.slice(0, 15).map((f: any) => `FILE: ${f.path}\n${f.content.slice(0, 2000)}`).join('\n---\n');
+
+    const response = await this.callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: DOCUMENTATION_SYSTEM_PROMPT },
+      { role: 'user', content: `Project Structure:\n${fileSummary}\n\nSample Content:\n${sampleContent}` }
+    ]);
+
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonString = jsonMatch ? jsonMatch[0] : response;
+      const result = JSON.parse(jsonString);
+      
+      await this.logEvent(jobId, 'Documentation Agent', 'completion', `Generated ${result.files?.length || 0} docs and ${result.components?.length || 0} component specs.`);
+      return result;
+    } catch (e) {
+      console.error("Documentation Agent parsing failed:", response);
+      throw new Error("AI failed to produce structured documentation.");
     }
   }
 }
