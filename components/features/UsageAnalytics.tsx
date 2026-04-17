@@ -13,11 +13,11 @@ interface AnalyticsData {
 }
 
 export default function UsageAnalytics({
-  userId,
-  supabase,
+  userId = "",
+  supabase = null,
 }: {
-  userId: string;
-  supabase: any;
+  userId?: string;
+  supabase?: any;
 }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [period, setPeriod] = useState(30);

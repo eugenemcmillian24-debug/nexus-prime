@@ -33,10 +33,15 @@ interface ProjectFile {
 
 interface MultiFileEditorProps {
   projectId: string;
-  userId: string;
+  userId?: string;
   onBuild?: (files: ProjectFile[]) => void;
   onVersionCreated?: () => void;
   readOnly?: boolean;
+  files?: ProjectFile[];
+  activeFileId?: string;
+  onFileSelect?: (id: string) => void;
+  onFileClose?: (id: string) => void;
+  onFileSave?: (id: string, content: string) => Promise<void>;
 }
 
 const DEFAULT_FILES: ProjectFile[] = [

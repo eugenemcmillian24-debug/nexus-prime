@@ -46,11 +46,11 @@ export interface ModelSelection {
 }
 
 export default function ModelSelector({
-  selection,
-  onChange,
+  selection = { reasoner: "llama-3.3-70b-versatile", coder: "llama-3.3-70b-versatile", vision: "google/gemini-2.0-flash" },
+  onChange = () => {},
 }: {
-  selection: ModelSelection;
-  onChange: (selection: ModelSelection) => void;
+  selection?: ModelSelection;
+  onChange?: (selection: ModelSelection) => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 

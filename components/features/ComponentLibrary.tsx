@@ -26,13 +26,13 @@ const COMPONENT_CATEGORIES = [
 ];
 
 export default function ComponentLibrary({
-  userId,
-  supabase,
-  onInsertComponent,
+  userId = "",
+  supabase = null,
+  onInsertComponent = () => {},
 }: {
-  userId: string;
-  supabase: any;
-  onInsertComponent: (code: string) => void;
+  userId?: string;
+  supabase?: any;
+  onInsertComponent?: (code: string) => void;
 }) {
   const [components, setComponents] = useState<SavedComponent[]>([]);
   const [category, setCategory] = useState("all");

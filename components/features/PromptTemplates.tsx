@@ -26,13 +26,13 @@ const CATEGORIES = [
 ];
 
 export default function PromptTemplates({
-  onSelectTemplate,
-  userId,
-  supabase,
+  onSelectTemplate = () => {},
+  userId = "",
+  supabase = null,
 }: {
-  onSelectTemplate: (prompt: string) => void;
-  userId: string;
-  supabase: any;
+  onSelectTemplate?: (prompt: string) => void;
+  userId?: string;
+  supabase?: any;
 }) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [category, setCategory] = useState("all");

@@ -25,13 +25,16 @@ interface FileNode {
 }
 
 interface FileExplorerProps {
-  files: { path: string; content: string; language?: string }[];
-  activeFile: string;
-  onSelectFile: (path: string) => void;
-  onCreateFile: (path: string) => void;
-  onDeleteFile: (path: string) => void;
-  onRenameFile: (oldPath: string, newPath: string) => void;
+  files?: { path: string; content: string; language?: string }[];
+  activeFile?: string;
+  onSelectFile?: (path: string) => void;
+  onCreateFile?: (path: string) => void;
+  onDeleteFile?: (path: string) => void;
+  onRenameFile?: (oldPath: string, newPath: string) => void;
   readOnly?: boolean;
+  projectId?: string;
+  onFileSelect?: (file: any) => void;
+  compact?: boolean;
 }
 
 function getFileIcon(name: string) {
@@ -222,13 +225,15 @@ function TreeNode({
 }
 
 export default function FileExplorer({
-  files,
-  activeFile,
-  onSelectFile,
-  onCreateFile,
-  onDeleteFile,
-  onRenameFile,
-  readOnly,
+  files = [],
+  activeFile = "",
+  onSelectFile = () => {},
+  onCreateFile = () => {},
+  onDeleteFile = () => {},
+  onRenameFile = () => {},
+  readOnly = false,
+  projectId,
+  onFileSelect,
 }: FileExplorerProps) {
   const [showNewFile, setShowNewFile] = useState(false);
   const [newFilePath, setNewFilePath] = useState("");

@@ -12,11 +12,11 @@ interface Shortcut {
 }
 
 interface CommandPaletteProps {
-  shortcuts: Shortcut[];
-  commands: { id: string; label: string; action: () => void; category?: string }[];
+  shortcuts?: Shortcut[];
+  commands?: { id: string; label: string; action: () => void; category?: string }[];
 }
 
-export default function CommandPalette({ shortcuts, commands }: CommandPaletteProps) {
+export default function CommandPalette({ shortcuts = [], commands = [] }: CommandPaletteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
 

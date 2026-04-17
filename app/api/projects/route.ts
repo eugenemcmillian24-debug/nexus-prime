@@ -65,7 +65,11 @@ export async function POST(req: NextRequest) {
       size_bytes: new TextEncoder().encode(f.content || "").length,
     }));
 
-    await supabase.from("project_files").insert(fileRecords);
+    const { error: filesError } = await supabase.from("project_files").insert(fileRecords);
+    if (filesError) {
+      console.error("Failed to insert initial files:", filesError);
+      // Continue anyway, project is created
+    }
   }
 
   // Create initial version
@@ -76,13 +80,17 @@ export async function POST(req: NextRequest) {
     is_entry_point: f.is_entry_point || false,
   }));
 
-  await supabase.from("project_versions").insert({
+  const { error: versionError } = await supabase.from("project_versions").insert({
     project_id: project.id,
     version_number: 1,
     message: "Initial version",
     snapshot,
     created_by: userId,
   });
+
+  if (versionError) {
+    console.error("Failed to create initial version:", versionError);
+  }
 
   return NextResponse.json({ project }, { status: 201 });
 }
