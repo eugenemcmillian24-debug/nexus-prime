@@ -160,7 +160,7 @@ OUTPUT: Return ONLY a JSON object with the following structure:
     { "path": "string", "content": "string" }
   ],
   "components": [
-    { "name": "string", "description": "string", "props": "string", "usage": "string" }
+    { "name": "string", "path": "string", "description": "string", "props": "string", "usage": "string" }
   ]
 }
 
@@ -199,30 +199,24 @@ const TEST_GENERATOR_SYSTEM_PROMPT = `
 `.trim();
 
 const PERFORMANCE_AGENT_SYSTEM_PROMPT = `
-You are the NEXUS PRIME Performance Optimization Agent. Your goal is to identify performance bottlenecks, inefficient code patterns, and potential optimizations in the provided codebase.
+...
+`.trim();
 
-AUDIT SCOPE:
-1. RENDER OPTIMIZATION: Unnecessary re-renders, missing memoization.
-2. BUNDLE SIZE: Large dependencies, inefficient imports.
-3. API PERFORMANCE: N+1 queries, lack of caching, slow Server Actions.
-4. ASSET OPTIMIZATION: Unoptimized images, font loading issues.
-5. CODE EFFICIENCY: Algorithmic complexity, memory leaks.
+const COMPONENT_PARSER_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Component Architect. Your goal is to extract the interface/props and a default configuration for a given React component.
+
+TASK:
+1. ANALYZE the provided React component code.
+2. EXTRACT all props, their types, and whether they are optional.
+3. GENERATE a JSON object representing the prop schema and a default value for each prop.
 
 OUTPUT FORMAT:
-Return a JSON array of optimization objects:
-[
-  {
-    "id": "string",
-    "type": "render" | "bundle" | "api" | "asset" | "logic",
-    "impact": "critical" | "high" | "medium" | "low",
-    "title": "string",
-    "description": "string",
-    "file": "string",
-    "recommendation": "string",
-    "fix": "string" (optional code snippet)
-  }
-]
-Return ONLY the JSON array. No conversational filler.
+{
+  "props": [
+    { "name": "string", "type": "string", "optional": boolean, "defaultValue": any, "options": string[] (if enum) }
+  ]
+}
+Return ONLY the raw JSON object. No conversational filler.
 `.trim();
 
 export class NexusOrchestrator {
@@ -459,17 +453,24 @@ export class NexusOrchestrator {
    * AI Performance Analysis
    */
   async analyzePerformance(files: { path: string, content: string }[]) {
+    // ... existing analyzePerformance ...
+  }
+
+  /**
+   * AI Component Prop Parsing
+   */
+  async parseComponentProps(fileContent: string) {
     const response = await this.callGroq('llama-3.3-70b-versatile', [
-      { role: 'system', content: PERFORMANCE_AGENT_SYSTEM_PROMPT },
-      { role: 'user', content: `Analyze the performance of these files:\n${JSON.stringify(files)}` }
+      { role: 'system', content: COMPONENT_PARSER_SYSTEM_PROMPT },
+      { role: 'user', content: `Extract props from this component:\n${fileContent}` }
     ]);
 
     try {
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
       return JSON.parse(jsonMatch ? jsonMatch[0] : response);
     } catch (e) {
-      console.error('Performance Analysis Parse Error:', e);
-      return [];
+      console.error('Prop Parsing Error:', e);
+      return { props: [] };
     }
   }
 

@@ -16,8 +16,11 @@ import {
   RefreshCw
 } from "lucide-react";
 
+import ComponentPlayground from "@/components/features/ComponentPlayground";
+
 interface ComponentSpec {
   name: string;
+  path?: string; // Add path if available
   description: string;
   props: string;
   usage: string;
@@ -213,11 +216,30 @@ export default function DocumentationLab({ projectId }: DocumentationLabProps) {
                 )}
               </div>
             ) : (
-              <div className="max-w-4xl space-y-12 animate-in fade-in duration-500">
-                {result.components?.find(c => compMatch(c, selectedDoc)) && (
-                  <ComponentDetail comp={result.components.find(c => compMatch(c, selectedDoc))!} onCopy={copyToClipboard} />
-                )}
+          <div className="max-w-4xl space-y-12 animate-in fade-in duration-500 h-full">
+            {result.components?.find(c => compMatch(c, selectedDoc)) && (
+              <div className="h-full flex flex-col">
+                <div className="mb-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 bg-[#00ff8811] rounded-sm flex items-center justify-center text-[#00ff88]">
+                      <Puzzle size={18} />
+                    </div>
+                    <h2 className="text-2xl font-bold tracking-tighter uppercase text-white">{selectedDoc}</h2>
+                  </div>
+                  <p className="text-[11px] text-[#737373] leading-relaxed uppercase tracking-wider">
+                    {result.components.find(c => compMatch(c, selectedDoc))?.description}
+                  </p>
+                </div>
+
+                <div className="flex-1 min-h-0">
+                  <ComponentPlayground 
+                    projectId={projectId} 
+                    componentPath={result.components.find(c => compMatch(c, selectedDoc))?.path || `components/${selectedDoc}.tsx`} 
+                  />
+                </div>
               </div>
+            )}
+          </div>
             )}
           </div>
         </div>
