@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const CreateOrgSchema = z.object({
   userId: z.string().uuid(),
@@ -22,11 +17,16 @@ const InviteMemberSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = user.id;
+
     const body = await req.json();
     const action = body.action;
 
     if (action === "create") {
-      const { userId, name, slug } = CreateOrgSchema.parse(body);
+      const { name, slug } = CreateOrgSchema.parse({ ...body, userId: user.id });
 
       const { data: org, error } = await supabase
         .from("organizations")
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     }
 
     if (action === "invite") {
-      const { userId, organizationId, inviteeEmail, role } = InviteMemberSchema.parse(body);
+      const { organizationId, inviteeEmail, role } = InviteMemberSchema.parse({ ...body, userId: user.id });
 
       // Verify requester is admin/owner
       const { data: membership } = await supabase
@@ -110,10 +110,10 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId");
-
-  if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = user.id;
 
   const { data: memberships } = await supabase
     .from("org_members")

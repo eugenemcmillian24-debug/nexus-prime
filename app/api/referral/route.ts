@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const CreateReferralSchema = z.object({
   userId: z.string().uuid(),
@@ -18,11 +13,16 @@ const RedeemReferralSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = user.id;
+
     const body = await req.json();
     const action = body.action;
 
     if (action === "create") {
-      const { userId } = CreateReferralSchema.parse(body);
+      const { userId } = CreateReferralSchema.parse({ ...body, userId: user.id });
 
       // Get or create referral code
       const { data: profile } = await supabase
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     }
 
     if (action === "redeem") {
-      const { userId, referralCode } = RedeemReferralSchema.parse(body);
+      const { userId, referralCode } = RedeemReferralSchema.parse({ ...body, userId: user.id });
 
       // Check user hasn't already been referred
       const { data: existingProfile } = await supabase
@@ -85,10 +85,10 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId");
-
-  if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = user.id;
 
   const { data: referrals } = await supabase
     .from("referrals")
