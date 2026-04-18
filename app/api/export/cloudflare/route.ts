@@ -20,6 +20,12 @@ const DeploySchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    // Auth check
+    const { createClient } = await import('@/lib/supabase/api');
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     if (!CF_API_TOKEN || !CF_ACCOUNT_ID) {
       return NextResponse.json(
         {
