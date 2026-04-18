@@ -312,7 +312,7 @@ export default function Page() {
             </button>
             <button
               onClick={() => setActiveTab('editor')}
-              className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === 'editor' ? 'text-[#00ff88]' : 'text-[#444] hover:text-white'}`}
+              className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${(activeTab as string) === 'editor' ? 'text-[#00ff88]' : 'text-[#444] hover:text-white'}`}
             >
               <Icons.Code2 size={14} /> Editor
             </button>
