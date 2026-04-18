@@ -33,11 +33,10 @@ export default function Page() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobResult, setJobResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [showPricing, setShowPricing] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [showProjectHistory, setShowProjectHistory] = useState(false);
-  const [showTrainingLab, setShowTrainingLab] = useState(false);
-  const [showAgencySettings, setShowAgencySettings] = useState(false);
+  const [activeTab, setActiveTab] = useState<'build' | 'training' | 'agency' | 'history' | 'projects' | 'pricing' | 'editor'>('build');
+  const [projects, setProjects] = useState<any[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [currentProjectName, setCurrentProjectName] = useState<string>("");
   const [authLoading, setAuthLoading] = useState(true);
   const [templateCategory, setTemplateCategory] = useState("all");
   const [selectedAgentType, setSelectedAgentType] = useState("builder");
@@ -67,8 +66,17 @@ export default function Page() {
   useEffect(() => {
     if (user) {
       fetchTrainingModules();
+      fetchProjects();
     }
   }, [user]);
+
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch("/api/projects");
+      const data = await res.json();
+      setProjects(data.projects || []);
+    } catch (e) {}
+  };
 
   const fetchTrainingModules = async () => {
     const { data } = await supabase.from('agent_training_modules').select('*').eq('user_id', user?.id).order('created_at', { ascending: false });
@@ -102,9 +110,33 @@ export default function Page() {
           table: "agent_jobs",
           filter: `id=eq.${jobId}`,
         },
-        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+        async (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
           if ((payload.new as Record<string, unknown>).status === "completed") {
-            setJobResult((payload.new as Record<string, unknown>).result);
+            const result = (payload.new as Record<string, unknown>).result;
+            setJobResult(result);
+            
+            // AUTO-CONVERT TO PROJECT FOR THE EDITOR
+            if (result && (result as any).code?.files) {
+              try {
+                const res = await fetch("/api/projects", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    name: `Build ${jobId.slice(0, 8)}`,
+                    description: prompt.slice(0, 100),
+                    files: (result as any).code.files
+                  })
+                });
+                const data = await res.json();
+                if (data.project) {
+                  setCurrentProjectId(data.project.id);
+                  setCurrentProjectName(data.project.name);
+                  setActiveTab('editor');
+                }
+              } catch (e) {
+                console.error("Auto-project creation failed", e);
+              }
+            }
           }
         }
       )
@@ -176,16 +208,22 @@ export default function Page() {
   };
 
   const handleLoadBuild = (build: any) => {
-    if (build.result?.code) {
+    if (build.id && activeTab === 'projects') {
+      // It's a project (projects tab uses the projects table)
+      setCurrentProjectId(build.id);
+      setCurrentProjectName(build.name);
+      setActiveTab('editor');
+    } else if (build.result?.code) {
+      // It's a job
       setJobId(build.id);
       setJobResult(build.result);
-      setShowProjectHistory(false);
+      setActiveTab('build');
     }
   };
 
   const handleForkBuild = (build: any) => {
     setPrompt(build.prompt || "");
-    setShowProjectHistory(false);
+    setActiveTab('build');
   };
 
   const handleNewBuild = (newResult: any) => {
@@ -214,39 +252,39 @@ export default function Page() {
             <h1 className="text-xl font-bold tracking-tighter text-white uppercase tracking-widest">Nexus Prime</h1>
           </div>
           <div className="flex flex-wrap gap-3 md:gap-4 text-[9px] md:text-xs uppercase tracking-widest items-center justify-center md:justify-end">
-            <Link href="/dashboard" className="text-[#444] hover:text-white transition-all">
-              [ Dashboard ]
-            </Link>
-            <Link href="/gallery" className="text-[#444] hover:text-white transition-all">
-              [ Gallery ]
-            </Link>
             <button
-              onClick={() => { setShowProjectHistory(!showProjectHistory); setShowHistory(false); setShowPricing(false); }}
-              className={`hover:text-white transition-all ${showProjectHistory ? 'text-white' : 'text-[#444]'}`}
+              onClick={() => setActiveTab('editor')}
+              className={`hover:text-white transition-all ${activeTab === 'editor' ? 'text-white' : 'text-[#444]'}`}
             >
-              [ Builds ]
+              [ Editor ]
             </button>
             <button
-              onClick={() => { setShowHistory(!showHistory); setShowProjectHistory(false); setShowPricing(false); }}
-              className={`hover:text-white transition-all ${showHistory ? 'text-white' : 'text-[#444]'}`}
+              onClick={() => setActiveTab('projects')}
+              className={`hover:text-white transition-all ${activeTab === 'projects' ? 'text-white' : 'text-[#444]'}`}
+            >
+              [ Projects ]
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`hover:text-white transition-all ${activeTab === 'history' ? 'text-white' : 'text-[#444]'}`}
             >
               [ Credits ]
             </button>
             <button
-              onClick={() => { setShowTrainingLab(!showTrainingLab); setShowProjectHistory(false); setShowHistory(false); setShowPricing(false); setShowAgencySettings(false); }}
-              className={`hover:text-white transition-all ${showTrainingLab ? 'text-white' : 'text-[#444]'}`}
+              onClick={() => setActiveTab('training')}
+              className={`hover:text-white transition-all ${activeTab === 'training' ? 'text-white' : 'text-[#444]'}`}
             >
               [ Training Lab ]
             </button>
             <button
-              onClick={() => { setShowAgencySettings(!showAgencySettings); setShowTrainingLab(false); setShowProjectHistory(false); setShowHistory(false); setShowPricing(false); }}
-              className={`hover:text-indigo-400 transition-all ${showAgencySettings ? 'text-indigo-400' : 'text-[#444]'}`}
+              onClick={() => setActiveTab('agency')}
+              className={`hover:text-indigo-400 transition-all ${activeTab === 'agency' ? 'text-indigo-400' : 'text-[#444]'}`}
             >
               [ Agency ]
             </button>
             <button
-              onClick={() => { setShowPricing(!showPricing); setShowHistory(false); setShowProjectHistory(false); setShowTrainingLab(false); }}
-              className="text-[#00ff88] hover:underline transition-all"
+              onClick={() => setActiveTab('pricing')}
+              className={`hover:text-[#00ff88] transition-all ${activeTab === 'pricing' ? 'text-[#00ff88]' : 'text-[#444]'}`}
             >
               [ Buy Credits ]
             </button>
@@ -263,31 +301,82 @@ export default function Page() {
         </header>
 
 
-        {/* Agency White-Label Overlay */}
-        {showAgencySettings && (
-          <div className="bg-[#0a0a0a] border border-indigo-500/44 p-4 md:p-8 animate-in zoom-in-95 duration-300">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-indigo-400 text-lg font-bold tracking-widest uppercase">Agency White-Label</h2>
-              <button onClick={() => setShowAgencySettings(false)} className="text-[#444] hover:text-white">✕</button>
+        {/* Unified Dashboard Navigation */}
+        {activeTab !== 'editor' && !jobId && (
+          <div className="flex items-center gap-6 border-b border-[#1a1a1a] pb-2 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => setActiveTab('build')}
+              className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === 'build' ? 'text-[#00ff88]' : 'text-[#444] hover:text-white'}`}
+            >
+              <Icons.Zap size={14} /> AI Builder
+            </button>
+            <button
+              onClick={() => setActiveTab('editor')}
+              className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === 'editor' ? 'text-[#00ff88]' : 'text-[#444] hover:text-white'}`}
+            >
+              <Icons.Code2 size={14} /> Editor
+            </button>
+            <button
+              onClick={() => setActiveTab('projects')}
+              className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === 'projects' ? 'text-[#00ff88]' : 'text-[#444] hover:text-white'}`}
+            >
+              <Icons.FolderOpen size={14} /> Projects
+            </button>
+            <button
+              onClick={() => setActiveTab('training')}
+              className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === 'training' ? 'text-[#00ff88]' : 'text-[#444] hover:text-white'}`}
+            >
+              <Icons.Brain size={14} /> Training Lab
+            </button>
+            <button
+              onClick={() => setActiveTab('agency')}
+              className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === 'agency' ? 'text-indigo-400' : 'text-[#444] hover:text-white'}`}
+            >
+              <Icons.Shield size={14} /> Agency Mode
+            </button>
+            <Link href="/gallery" className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 text-[#444] hover:text-white">
+              <Icons.Image size={14} /> Gallery
+            </Link>
+          </div>
+        )}
+
+        {/* Editor Tab (Full Professional Suite) */}
+        {activeTab === 'editor' && currentProjectId && (
+          <div className="fixed inset-0 z-50 bg-[#050505]">
+            <div className="absolute top-4 right-8 z-[60]">
+               <button 
+                 onClick={() => setActiveTab('build')}
+                 className="bg-[#111] border border-[#1a1a1a] text-[#444] hover:text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest rounded-sm"
+               >
+                 Close Editor
+               </button>
             </div>
+            <AppLayout
+              userId={user.id}
+              projectId={currentProjectId}
+              projectName={currentProjectName}
+            />
+          </div>
+        )}
+
+        {/* Tab Content Rendering */}
+        {!jobId && activeTab === 'agency' && (
+          <div className="bg-[#0a0a0a] border border-indigo-500/44 p-4 md:p-8 animate-in zoom-in-95 duration-300">
             <AgencyWhiteLabelSettings />
           </div>
         )}
-        {showTrainingLab && (
+        {!jobId && activeTab === 'training' && (
           <div className="bg-[#0a0a0a] border border-[#00ff8844] p-4 md:p-8 animate-in zoom-in-95 duration-300">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-[#00ff88] text-lg font-bold tracking-widest uppercase">Training Lab</h2>
-              <button onClick={() => setShowTrainingLab(false)} className="text-[#444] hover:text-white">✕</button>
-            </div>
             <AgentTrainingLab />
           </div>
         )}
-        {showPricing && (
+        {!jobId && activeTab === 'pricing' && (
           <div className="bg-[#0a0a0a] border border-[#00ff8844] p-4 md:p-8 animate-in zoom-in-95 duration-300">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-[#00ff88] text-lg font-bold tracking-widest uppercase">Monetization Hub</h2>
-              <button onClick={() => setShowPricing(false)} className="text-[#444] hover:text-white">✕</button>
+              <button onClick={() => setActiveTab('build')} className="text-[#444] hover:text-white">✕</button>
             </div>
+            {/* ... pricing content ... */}
 
             <div className="space-y-8">
               {/* Subscriptions */}
@@ -366,34 +455,59 @@ export default function Page() {
 
 
 
-        {/* Credit History Section Overlay */}
-        {showHistory && (
+        {/* Credit History Section */}
+        {!jobId && activeTab === 'history' && (
           <div className="animate-in zoom-in-95 duration-300">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-white text-xs font-bold tracking-[0.3em] uppercase">Transaction Sequence</h2>
-              <button onClick={() => setShowHistory(false)} className="text-[#444] hover:text-white">✕</button>
+              <button onClick={() => setActiveTab('build')} className="text-[#444] hover:text-white">✕</button>
             </div>
             <CreditHistory userId={user.id} />
           </div>
         )}
 
-        {/* Project History Overlay (Feature 1) */}
-        {showProjectHistory && (
-          <div className="animate-in zoom-in-95 duration-300">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-white text-xs font-bold tracking-[0.3em] uppercase">Build History</h2>
-              <button onClick={() => setShowProjectHistory(false)} className="text-[#444] hover:text-white">✕</button>
+        {/* Project History */}
+        {!jobId && activeTab === 'projects' && (
+          <div className="animate-in zoom-in-95 duration-300 space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-white text-xs font-bold tracking-[0.3em] uppercase">Persistent Sequences</h2>
+              <button onClick={() => setActiveTab('build')} className="text-[#444] hover:text-white">✕</button>
             </div>
-            <ProjectHistory
-              userId={user.id}
-              onLoadBuild={handleLoadBuild}
-              onForkBuild={handleForkBuild}
-            />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {projects.length === 0 ? (
+                <div className="col-span-full py-20 text-center border border-dashed border-[#1a1a1a] text-[#333] uppercase text-[10px] tracking-widest">
+                  No active projects detected. Execute a build sequence to start.
+                </div>
+              ) : (
+                projects.map((project) => (
+                  <div 
+                    key={project.id}
+                    onClick={() => handleLoadBuild(project)}
+                    className="group bg-[#0a0a0a] border border-[#1a1a1a] hover:border-[#00ff8844] p-6 transition-all cursor-pointer space-y-4 relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:text-[#00ff88] group-hover:opacity-30 transition-all">
+                      <Icons.Code2 size={40} />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-[10px] text-[#444] uppercase tracking-widest font-bold group-hover:text-[#00ff88] transition-colors">{project.name}</div>
+                      <p className="text-[9px] text-[#222] line-clamp-2 uppercase tracking-tighter leading-relaxed">
+                        {project.description || "NO DESCRIPTION LOGGED"}
+                      </p>
+                    </div>
+                    <div className="flex justify-between items-center pt-4 border-t border-white/5 text-[8px] text-[#222] uppercase tracking-widest">
+                      <span>SYNCED: {new Date(project.updated_at).toLocaleDateString()}</span>
+                      <span className="text-[#444]">V{project.current_version || 1}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
 
         {/* Input Section */}
-        {!jobId && !showPricing && !showHistory && !showProjectHistory && !showTrainingLab && !showAgencySettings ? (
+        {!jobId && activeTab === 'build' ? (
           <div className="space-y-8 animate-in fade-in duration-500">
         {/* Templates Section (Feature 3 - Enhanced) */}
         <div className="space-y-4">
@@ -476,6 +590,12 @@ export default function Page() {
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      startBuild();
+                    }
+                  }}
                   placeholder="Describe the application you want to build..."
                   className="w-full h-40 bg-[#0a0a0a] border border-[#1a1a1a] p-6 text-white outline-none focus:border-[#00ff88] transition-colors resize-none custom-scrollbar placeholder:text-[#333]"
                 />
