@@ -167,7 +167,8 @@ export async function POST(req: Request) {
       repoFullName: repo.full_name,
       commitSha: commit.sha,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.errors },
@@ -176,7 +177,7 @@ export async function POST(req: Request) {
     }
     console.error("GitHub Export Error:", error);
     return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
+      { error: message || "Internal Server Error" },
       { status: 500 }
     );
   }

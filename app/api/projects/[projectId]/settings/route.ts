@@ -42,9 +42,10 @@ export async function GET(
     createdAt: project.created_at,
     updatedAt: project.updated_at,
   });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error('GET error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: message || 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -104,8 +105,9 @@ export async function PUT(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json(project);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error('PUT error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: message || 'Internal Server Error' }, { status: 500 });
   }
 }

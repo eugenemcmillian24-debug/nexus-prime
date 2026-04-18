@@ -33,8 +33,9 @@ export async function POST(req: Request) {
     const analysis = await orchestrator.analyzeDeploymentHealth(deploymentLogs);
 
     return NextResponse.json(analysis);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error('Deployment Health API Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

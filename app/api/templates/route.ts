@@ -53,7 +53,8 @@ export async function POST(req: Request) {
       message: 'Project published as template!',
       template: { id: Math.random().toString(36).substr(2, 9), name, description }
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

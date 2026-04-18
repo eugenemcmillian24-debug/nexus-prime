@@ -22,8 +22,9 @@ export async function POST(req: NextRequest) {
     const result = await orchestrator.healDeployment(deploymentId);
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error("Heal API Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: message || "Internal Server Error" }, { status: 500 });
   }
 }

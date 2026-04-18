@@ -121,7 +121,7 @@ export async function POST(req: Request) {
       version: newVersion,
       newBalance: creditResult.new_balance,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.errors },

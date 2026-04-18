@@ -43,8 +43,9 @@ export async function GET(
     framework: "Next.js",
     recentChanges: [], // Mocked for now
   });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error('GET error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: message || 'Internal Server Error' }, { status: 500 });
   }
 }

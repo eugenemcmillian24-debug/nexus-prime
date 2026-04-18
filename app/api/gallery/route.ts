@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     if (error) throw error;
 
     return NextResponse.json({ published });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: "Validation failed", details: error.errors }, { status: 400 });
     }
@@ -103,14 +103,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Failed to fetch gallery" }, { status: 500 });
   }
 
+  const response = NextResponse.json({
   return NextResponse.json({
     builds: data || [],
     total: count || 0,
     page,
     totalPages: Math.ceil((count || 0) / limit),
   });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error('GET error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: message || 'Internal Server Error' }, { status: 500 });
   }
 }

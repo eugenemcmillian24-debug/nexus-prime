@@ -54,7 +54,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json(deployment);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: 'Input Validation Failed', details: error.errors },
@@ -62,6 +63,6 @@ export async function POST(req: Request) {
       );
     }
     console.error('Deployment API Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: message || 'Internal Server Error' }, { status: 500 });
   }
 }

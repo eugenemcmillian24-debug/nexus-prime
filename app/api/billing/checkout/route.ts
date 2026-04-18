@@ -92,7 +92,8 @@ export async function POST(req: Request) {
 
 
     return NextResponse.json({ url: session.url });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Internal Server Error";
     if (err instanceof ZodError) {
       return NextResponse.json(
         { error: 'Input Validation Failed', details: err.errors },
@@ -100,6 +101,6 @@ export async function POST(req: Request) {
       );
     }
     console.error('Checkout Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

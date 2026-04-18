@@ -113,7 +113,8 @@ export async function POST(req: Request) {
       deploymentId: result.id,
       projectName,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.errors },
@@ -122,7 +123,7 @@ export async function POST(req: Request) {
     }
     console.error("Cloudflare Deploy Error:", error);
     return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
+      { error: message || "Internal Server Error" },
       { status: 500 }
     );
   }

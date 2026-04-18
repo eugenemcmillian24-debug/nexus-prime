@@ -168,9 +168,10 @@ Respond ONLY with valid JSON in this exact format:
     await supabase.from("code_reviews").update({ status: "failed" }).eq("id", review.id);
     return NextResponse.json({ error: "Review failed" }, { status: 500 });
   }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error('POST error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: message || 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -207,8 +208,9 @@ export async function GET(req: NextRequest) {
       completedAt: r.completed_at,
     }))
   );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error('GET error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: message || 'Internal Server Error' }, { status: 500 });
   }
 }

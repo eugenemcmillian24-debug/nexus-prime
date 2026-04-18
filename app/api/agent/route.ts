@@ -105,7 +105,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ jobId: job.id, newBalance: result.new_balance });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: 'Input Validation Failed', details: error.errors },

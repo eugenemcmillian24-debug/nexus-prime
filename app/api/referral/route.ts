@@ -61,6 +61,17 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Already used a referral code" }, { status: 400 });
       }
 
+      // Block self-referral
+      const { data: referrer } = await supabase
+        .from("referrals")
+        .select("referrer_id")
+        .eq("referral_code", referralCode)
+        .single();
+
+      if (referrer?.referrer_id === userId) {
+        return NextResponse.json({ error: "You cannot use your own referral code" }, { status: 400 });
+      }
+
       // Complete referral
       const { data: result } = await supabase.rpc("complete_referral", {
         p_referral_code: referralCode,
@@ -75,7 +86,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: "Validation failed", details: error.errors }, { status: 400 });
     }
@@ -109,8 +120,9 @@ export async function GET(req: Request) {
     totalReferred: referrals?.filter((r: any) => r.status === "completed").length || 0,
     totalCreditsEarned: referrals?.reduce((sum: number, r: any) => sum + (r.credits_awarded_referrer || 0), 0) || 0,
   });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error('GET error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: message || 'Internal Server Error' }, { status: 500 });
   }
 }

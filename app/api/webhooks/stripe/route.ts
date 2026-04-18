@@ -34,10 +34,29 @@ export async function POST(req: Request) {
 
   try {
     event = stripe.webhooks.constructEvent(body, sig!, webhookSecret);
-  } catch (err: any) {
-    console.error('Webhook signature verification failed:', err.message);
-    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Webhook signature verification failed:', errMsg);
+    return NextResponse.json({ error: `Webhook Error: ${errMsg}` }, { status: 400 });
   }
+
+  // Idempotency: skip already-processed events
+  const { data: existing } = await supabase
+    .from('webhook_events')
+    .select('id')
+    .eq('event_id', event.id)
+    .maybeSingle();
+
+  if (existing) {
+    return NextResponse.json({ received: true, skipped: 'duplicate' });
+  }
+
+  // Record event before processing (prevents reprocessing on retry)
+  await supabase.from('webhook_events').insert({
+    event_id: event.id,
+    event_type: event.type,
+    processed_at: new Date().toISOString(),
+  });
 
   try {
     switch (event.type) {
@@ -200,7 +219,8 @@ export async function POST(req: Request) {
       default:
         // console.log(`Unhandled event type: ${event.type}`);
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : 'Unknown error';
     console.error(`Error processing ${event.type}:`, err);
     return NextResponse.json({ error: 'Webhook handler error' }, { status: 500 });
   }

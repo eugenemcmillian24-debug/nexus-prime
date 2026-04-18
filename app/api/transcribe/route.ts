@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     const text = await orchestrator.transcribe(file);
 
     return NextResponse.json({ text });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: 'Input Validation Failed', details: error.errors },
