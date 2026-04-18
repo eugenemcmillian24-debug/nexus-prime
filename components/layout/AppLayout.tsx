@@ -3,7 +3,13 @@
 import React, { useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { isNexusPrimeAdmin } from "@/lib/nexus_prime_access";
+import { checkIsAdmin } from "@/lib/access_client";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder"
+) : null as any;
 
 // Lazy-load all feature components for code splitting
 const PromptTemplates = dynamic(() => import("@/components/features/PromptTemplates"), { ssr: false });
@@ -117,7 +123,11 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    isNexusPrimeAdmin().then(setIsAdmin);
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAdmin(checkIsAdmin(session?.user || null));
+    };
+    checkUser();
 
     const handleResize = () => {
       const mobile = window.innerWidth < 768;

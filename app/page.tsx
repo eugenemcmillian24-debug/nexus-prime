@@ -15,6 +15,7 @@ import { createClient, User, AuthChangeEvent, Session, RealtimePostgresChangesPa
 import { NEXUS_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/templates";
 import * as Icons from "lucide-react";
 import Link from "next/link";
+import { checkIsAdmin } from "@/lib/access_client";
 import { PREMIUM_AGENTS } from "@/lib/nexus_prime_constants";
 
 const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
@@ -44,13 +45,7 @@ export default function Page() {
   const [trainingModules, setTrainingModules] = useState<any[]>([]);
 
   useEffect(() => {
-    if (user) {
-      const isAdmin = user.app_metadata?.role === 'admin' || user.user_metadata?.is_admin === true;
-      const superuserEmails = ['eugenemcmillian24@gmail.com'];
-      setIsAdmin(isAdmin || superuserEmails.includes(user.email || ''));
-    } else {
-      setIsAdmin(false);
-    }
+    setIsAdmin(checkIsAdmin(user));
   }, [user]);
 
   useEffect(() => {
@@ -80,6 +75,8 @@ export default function Page() {
     setTrainingModules(data || []);
   };
 
+  useEffect(() => {
+    if (!user) return;
     const channel = supabase
       .channel(`credits-${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_credits', filter: `user_id=eq.${user.id}` }, (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
