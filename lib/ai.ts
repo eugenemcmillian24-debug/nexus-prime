@@ -627,6 +627,62 @@ export class NexusOrchestrator {
       data: f.content,
     }));
 
+    // ENSURE PACKAGE.JSON EXISTS FOR VERCEL BUILD
+    if (!files.some(f => f.path === 'package.json')) {
+      deploymentFiles.push({
+        file: 'package.json',
+        data: JSON.stringify({
+          name: projectName,
+          version: "0.1.0",
+          private: true,
+          dependencies: {
+            "next": "14.2.35",
+            "react": "^18",
+            "react-dom": "^18",
+            "lucide-react": "^0.378.0",
+            "tailwind-merge": "^2.3.0",
+            "clsx": "^2.1.1"
+          },
+          devDependencies: {
+            "typescript": "^5",
+            "@types/node": "^20",
+            "@types/react": "^18",
+            "@types/react-dom": "^18",
+            "postcss": "^8",
+            "tailwindcss": "^3.4.1"
+          }
+        }, null, 2)
+      });
+    }
+
+    // ENSURE TSCONFIG.JSON EXISTS
+    if (!files.some(f => f.path === 'tsconfig.json')) {
+      deploymentFiles.push({
+        file: 'tsconfig.json',
+        data: JSON.stringify({
+          compilerOptions: {
+            target: "es5",
+            lib: ["dom", "dom.iterable", "esnext"],
+            allowJs: true,
+            skipLibCheck: true,
+            strict: true,
+            noEmit: true,
+            esModuleInterop: true,
+            module: "esnext",
+            moduleResolution: "bundler",
+            resolveJsonModule: true,
+            isolatedModules: true,
+            jsx: "preserve",
+            incremental: true,
+            plugins: [{ name: "next" }],
+            paths: { "@/*": ["./*"] }
+          },
+          include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+          exclude: ["node_modules"]
+        }, null, 2)
+      });
+    }
+
     try {
       const response = await fetch('https://api.vercel.com/v13/deployments' + (VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : ''), {
         method: 'POST',
