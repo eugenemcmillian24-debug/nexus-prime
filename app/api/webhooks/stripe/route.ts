@@ -159,7 +159,7 @@ export async function POST(req: Request) {
               .single();
 
             if (userCredit) {
-              // Add recurring credits
+              // Add recurring credits - record purchase
               await supabase.from('credit_purchases').insert({
                 user_id: userCredit.user_id,
                 amount_usd: (invoice.amount_paid || 0) / 100,
@@ -167,6 +167,15 @@ export async function POST(req: Request) {
                 stripe_payment_intent_id: invoice.payment_intent as string,
                 stripe_subscription_id: subId,
                 status: 'succeeded',
+              });
+
+              // Actually credit the user's balance
+              await supabase.rpc('add_user_credits', {
+                target_user_id: userCredit.user_id,
+                amount_to_add: plan.credits,
+                transaction_type: 'subscription_renewal',
+                transaction_desc: `Monthly renewal: ${plan.tier} plan`,
+                session_id: invoice.id
               });
             }
           }
