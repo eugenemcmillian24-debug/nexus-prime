@@ -244,7 +244,7 @@ export default function AgentTrainingLab() {
       </div>
 
       {activeTab === "analytics" && analytics && (
-        <div style={{ spaceY: "24px" }}>
+        <div className="space-y-6">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "24px" }}>
              <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", padding: "20px", borderRadius: "8px" }}>
                 <div style={{ fontSize: "10px", color: "#666", textTransform: "uppercase", marginBottom: "8px" }}>Total Blueprints Sold</div>
