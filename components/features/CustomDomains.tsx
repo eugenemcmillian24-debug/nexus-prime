@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { memo, useState, useEffect } from "react";
 
 interface DomainConfig {
   id: string;
@@ -33,7 +33,7 @@ const SSL_CONFIG = {
   error: { color: "#ef4444", label: "Error" },
 };
 
-export default function CustomDomains({ projectId, projectName }: CustomDomainsProps) {
+function CustomDomains({ projectId, projectName }: CustomDomainsProps) {
   const [domains, setDomains] = useState<DomainConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -319,3 +319,5 @@ export default function CustomDomains({ projectId, projectName }: CustomDomainsP
     </div>
   );
 }
+
+export default memo(CustomDomains);

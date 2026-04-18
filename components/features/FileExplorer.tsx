@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, memo } from "react";
 import {
   Folder,
   FileCode,
@@ -224,7 +224,7 @@ function TreeNode({
   );
 }
 
-export default function FileExplorer({
+function FileExplorer({
   files = [],
   activeFile = "",
   onSelectFile = () => {},
@@ -313,3 +313,5 @@ export default function FileExplorer({
     </div>
   );
 }
+
+export default memo(FileExplorer);

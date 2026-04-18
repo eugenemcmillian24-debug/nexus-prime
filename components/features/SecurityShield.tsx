@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { memo, useState, useEffect } from "react";
 import { 
   Shield, 
   AlertTriangle, 
@@ -29,7 +29,7 @@ interface SecurityShieldProps {
   onFixApplied?: (filePath: string, newCode: string) => void;
 }
 
-export default function SecurityShield({ projectId, onFixApplied }: SecurityShieldProps) {
+function SecurityShield({ projectId, onFixApplied }: SecurityShieldProps) {
   const [loading, setLoading] = useState(false);
   const [fixing, setFixing] = useState<string | null>(null);
   const [report, setReport] = useState<Vulnerability[] | null>(null);
@@ -210,3 +210,5 @@ export default function SecurityShield({ projectId, onFixApplied }: SecurityShie
     </div>
   );
 }
+
+export default memo(SecurityShield);

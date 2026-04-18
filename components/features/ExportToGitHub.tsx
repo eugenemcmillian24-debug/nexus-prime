@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { memo, useState } from "react";
 
 interface ExportToGitHubProps {
   projectId: string;
@@ -26,7 +26,7 @@ interface ExportLog {
   detail?: string;
 }
 
-export default function ExportToGitHub({ projectId, projectName }: ExportToGitHubProps) {
+function ExportToGitHub({ projectId, projectName }: ExportToGitHubProps) {
   const [step, setStep] = useState<"config" | "exporting" | "done">("config");
   const [config, setConfig] = useState<ExportConfig>({
     repoName: projectName?.toLowerCase().replace(/[^a-z0-9-]/g, "-") || "my-nexus-app",
@@ -358,3 +358,5 @@ export default function ExportToGitHub({ projectId, projectName }: ExportToGitHu
     </div>
   );
 }
+
+export default memo(ExportToGitHub);

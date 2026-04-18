@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { BarChart3, TrendingUp, Zap, Rocket, Clock, CreditCard } from "lucide-react";
 
 interface AnalyticsData {
@@ -12,7 +12,7 @@ interface AnalyticsData {
   model_usage: { model: string; count: number }[];
 }
 
-export default function UsageAnalytics({
+function UsageAnalytics({
   userId = "",
   supabase = null,
 }: {
@@ -136,3 +136,5 @@ export default function UsageAnalytics({
     </div>
   );
 }
+
+export default memo(UsageAnalytics);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { Shield, Layout, Mail, Image as ImageIcon, Save, CheckCircle, AlertTriangle } from 'lucide-react';
 import Image from "next/image";
 
@@ -12,7 +12,7 @@ interface AgencyConfig {
   hide_nexus_logs: boolean;
 }
 
-export default function AgencyWhiteLabelSettings() {
+function AgencyWhiteLabelSettings() {
   const [config, setConfig] = useState<AgencyConfig>({
     company_name: '',
     footer_html: '',
@@ -203,3 +203,5 @@ export default function AgencyWhiteLabelSettings() {
     </div>
   );
 }
+
+export default memo(AgencyWhiteLabelSettings);

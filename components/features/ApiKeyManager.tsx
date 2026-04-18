@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { memo, useState, useEffect } from "react";
 
 interface ApiKey {
   id: string;
@@ -28,7 +28,7 @@ const PROVIDERS = [
   { id: "stripe", name: "Stripe", icon: "💳", color: "#635bff", placeholder: "sk_live_...", docs: "https://dashboard.stripe.com/apikeys" },
 ];
 
-export default function ApiKeyManager({ userId }: ApiKeyManagerProps) {
+function ApiKeyManager({ userId }: ApiKeyManagerProps) {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -337,3 +337,5 @@ export default function ApiKeyManager({ userId }: ApiKeyManagerProps) {
     </div>
   );
 }
+
+export default memo(ApiKeyManager);

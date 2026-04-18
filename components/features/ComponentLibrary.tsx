@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { Blocks, Search, Plus, Heart, Code, Eye, Copy, Check, Tag } from "lucide-react";
 
 interface SavedComponent {
@@ -25,7 +25,7 @@ const COMPONENT_CATEGORIES = [
   { value: "animation", label: "Animations" },
 ];
 
-export default function ComponentLibrary({
+function ComponentLibrary({
   userId = "",
   supabase = null,
   onInsertComponent = () => {},
@@ -274,3 +274,5 @@ export default function ComponentLibrary({
     </div>
   );
 }
+
+export default memo(ComponentLibrary);

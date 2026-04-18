@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { memo, useState, useEffect } from "react";
 import { 
   TestTube, 
   Play, 
@@ -25,7 +25,7 @@ interface ProjectFile {
   language: string;
 }
 
-export default function TestGenerator({ projectId }: TestGeneratorProps) {
+function TestGenerator({ projectId }: TestGeneratorProps) {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [files, setFiles] = useState<ProjectFile[]>([]);
@@ -190,3 +190,5 @@ export default function TestGenerator({ projectId }: TestGeneratorProps) {
     </div>
   );
 }
+
+export default memo(TestGenerator);

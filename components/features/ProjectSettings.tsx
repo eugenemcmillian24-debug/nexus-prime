@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { memo, useState, useEffect } from "react";
 
 interface ProjectSettings {
   id: string;
@@ -46,7 +46,7 @@ const WEBHOOK_EVENTS = [
   "review.completed", "member.joined",
 ];
 
-export default function ProjectSettingsPanel({ projectId, onUpdate }: ProjectSettingsProps) {
+function ProjectSettingsPanel({ projectId, onUpdate }: ProjectSettingsProps) {
   const [settings, setSettings] = useState<ProjectSettings | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("general");
   const [isSaving, setIsSaving] = useState(false);
@@ -447,3 +447,5 @@ export default function ProjectSettingsPanel({ projectId, onUpdate }: ProjectSet
     </div>
   );
 }
+
+export default memo(ProjectSettingsPanel);

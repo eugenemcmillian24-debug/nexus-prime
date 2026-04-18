@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Cpu, ChevronDown, Zap, Brain, Eye, Shield } from "lucide-react";
 
 interface ModelOption {
@@ -45,7 +45,7 @@ export interface ModelSelection {
   vision: string;
 }
 
-export default function ModelSelector({
+function ModelSelector({
   selection = { reasoner: "llama-3.3-70b-versatile", coder: "llama-3.3-70b-versatile", vision: "google/gemini-2.0-flash" },
   onChange = () => {},
 }: {
@@ -136,3 +136,5 @@ export default function ModelSelector({
     </div>
   );
 }
+
+export default memo(ModelSelector);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { memo, useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Users,
@@ -42,7 +42,7 @@ const AGENT_COLORS: Record<string, string> = {
   User: "#737373",
 };
 
-export default function WarRoom({ projectId, onPlanConfirmed }: WarRoomProps) {
+function WarRoom({ projectId, onPlanConfirmed }: WarRoomProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -255,3 +255,5 @@ export default function WarRoom({ projectId, onPlanConfirmed }: WarRoomProps) {
     </div>
   );
 }
+
+export default memo(WarRoom);

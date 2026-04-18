@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { memo, useState, useEffect } from "react";
 import { TIER_LIMITS, PREMIUM_AGENTS } from "@/lib/nexus_prime_constants";
 
 interface EnvVar {
@@ -9,7 +9,7 @@ interface EnvVar {
   id?: string;
 }
 
-export default function AdminControlPanel() {
+function AdminControlPanel() {
   const [envs, setEnvs] = useState<EnvVar[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<{ supabase: boolean; stripe: boolean; vercel: boolean }>({
@@ -433,3 +433,5 @@ function StatusCard({ title, subtitle, active, feature }: { title: string; subti
     </div>
   );
 }
+
+export default memo(AdminControlPanel);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { memo, useState, useCallback } from "react";
 
 interface ReviewFinding {
   id: string;
@@ -51,7 +51,7 @@ const SEVERITY_CONFIG = {
   suggestion: { color: "#10b981", bg: "#f0fdf4", border: "#bbf7d0", icon: "🟢", label: "Suggestion" },
 };
 
-export default function AICodeReview({
+function AICodeReview({
   projectId,
   fileId,
   filePath,
@@ -373,3 +373,5 @@ export default function AICodeReview({
     </div>
   );
 }
+
+export default memo(AICodeReview);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { memo, useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { 
   Users, 
@@ -57,7 +57,7 @@ function stringToColor(str: string) {
   return COLORS[index];
 }
 
-export default function RealtimeCollab({ projectId, userId, userName, currentFile }: RealtimeCollabProps) {
+function RealtimeCollab({ projectId, userId, userName, currentFile }: RealtimeCollabProps) {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -343,3 +343,4 @@ export default function RealtimeCollab({ projectId, userId, userName, currentFil
   );
 }
 
+export default memo(RealtimeCollab);

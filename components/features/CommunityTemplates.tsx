@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -34,7 +34,7 @@ interface Template {
   prompt: string;
 }
 
-export default function CommunityTemplates({ onFork }: { onFork: (template: Template) => void }) {
+function CommunityTemplates({ onFork }: { onFork: (template: Template) => void }) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -193,3 +193,5 @@ export default function CommunityTemplates({ onFork }: { onFork: (template: Temp
     </div>
   );
 }
+
+export default memo(CommunityTemplates);

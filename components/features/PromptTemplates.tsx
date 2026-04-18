@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { Sparkles, Clock, Flame, Search, Plus, Heart, Copy, ChevronDown } from "lucide-react";
 
 interface Template {
@@ -25,7 +25,7 @@ const CATEGORIES = [
   { value: "custom", label: "Custom" },
 ];
 
-export default function PromptTemplates({
+function PromptTemplates({
   onSelectTemplate = () => {},
   userId = "",
   supabase = null,
@@ -206,3 +206,5 @@ export default function PromptTemplates({
     </div>
   );
 }
+
+export default memo(PromptTemplates);

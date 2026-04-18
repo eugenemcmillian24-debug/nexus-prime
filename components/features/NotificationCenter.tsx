@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { memo, useState, useEffect, useCallback } from "react";
 
 interface Notification {
   id: string;
@@ -28,7 +28,7 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
   marketplace: { icon: "💎", color: "#00ff88" },
 };
 
-export default function NotificationCenter({ userId }: NotificationCenterProps) {
+function NotificationCenter({ userId }: NotificationCenterProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<string | null>(null);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
@@ -247,3 +247,5 @@ export default function NotificationCenter({ userId }: NotificationCenterProps) 
     </div>
   );
 }
+
+export default memo(NotificationCenter);

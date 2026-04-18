@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { memo, useState, useEffect } from "react";
 
 interface PromptEntry {
   id: string;
@@ -29,7 +29,7 @@ const MODEL_COLORS: Record<string, string> = {
   openrouter: "#8b5cf6",
 };
 
-export default function PromptHistory({ projectId, onReplayPrompt }: PromptHistoryProps) {
+function PromptHistory({ projectId, onReplayPrompt }: PromptHistoryProps) {
   const [entries, setEntries] = useState<PromptEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterModel, setFilterModel] = useState<string | null>(null);
@@ -375,3 +375,5 @@ export default function PromptHistory({ projectId, onReplayPrompt }: PromptHisto
     </div>
   );
 }
+
+export default memo(PromptHistory);

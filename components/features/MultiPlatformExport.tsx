@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { memo, useState } from "react";
 import { 
   Github, 
   Globe, 
@@ -31,7 +31,7 @@ interface ExportStatus {
   error?: string;
 }
 
-export default function MultiPlatformExport({ projectId, projectName }: MultiPlatformExportProps) {
+function MultiPlatformExport({ projectId, projectName }: MultiPlatformExportProps) {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>("github");
   const [exportStatuses, setExportStatuses] = useState<Record<Platform, ExportStatus>>({
     github: { platform: "github", status: "idle" },
@@ -250,3 +250,5 @@ export default function MultiPlatformExport({ projectId, projectName }: MultiPla
     </div>
   );
 }
+
+export default memo(MultiPlatformExport);

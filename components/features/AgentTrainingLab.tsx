@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { memo, useState, useEffect } from "react";
 import * as Icons from "lucide-react";
 
 interface TrainingModule {
@@ -14,7 +14,7 @@ interface TrainingModule {
   created_at: string;
 }
 
-export default function AgentTrainingLab() {
+function AgentTrainingLab() {
   const [modules, setModules] = useState<TrainingModule[]>([]);
   const [marketplaceModules, setMarketplaceModules] = useState<TrainingModule[]>([]);
   const [featuredModules, setFeaturedModules] = useState<TrainingModule[]>([]);
@@ -365,3 +365,5 @@ export default function AgentTrainingLab() {
     </div>
   );
 }
+
+export default memo(AgentTrainingLab);

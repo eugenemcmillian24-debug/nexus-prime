@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { memo, useState } from "react";
 import { 
   Zap, 
   Activity, 
@@ -32,7 +32,7 @@ interface PerformanceMonitorProps {
   projectId: string;
 }
 
-export default function PerformanceMonitor({ projectId }: PerformanceMonitorProps) {
+function PerformanceMonitor({ projectId }: PerformanceMonitorProps) {
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<Optimization[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -188,3 +188,5 @@ export default function PerformanceMonitor({ projectId }: PerformanceMonitorProp
     </div>
   );
 }
+
+export default memo(PerformanceMonitor);

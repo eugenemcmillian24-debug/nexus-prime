@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { memo, useState, useEffect, useCallback } from "react";
 
 interface Suggestion {
   id: string;
@@ -47,7 +47,7 @@ const IMPACT_CONFIG = {
   high: { color: "#10b981", label: "High Impact" },
 };
 
-export default function ContextAwareSuggestions({ projectId, currentFile, onApplySuggestion }: ContextAwareSuggestionsProps) {
+function ContextAwareSuggestions({ projectId, currentFile, onApplySuggestion }: ContextAwareSuggestionsProps) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [projectContext, setProjectContext] = useState<ProjectContext | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -369,3 +369,5 @@ export default function ContextAwareSuggestions({ projectId, currentFile, onAppl
     </div>
   );
 }
+
+export default memo(ContextAwareSuggestions);
