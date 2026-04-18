@@ -61,7 +61,6 @@ export async function GET(req: NextRequest) {
     (profiles || []).map((p) => [p.id, { id: p.id, name: p.full_name || "Anonymous", avatar: p.avatar_url }])
   );
 
-  const response = NextResponse.json(
   return NextResponse.json(
     (data || []).map((t) => ({
       id: t.id,

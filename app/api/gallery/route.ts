@@ -103,7 +103,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Failed to fetch gallery" }, { status: 500 });
   }
 
-  const response = NextResponse.json({
   return NextResponse.json({
     builds: data || [],
     total: count || 0,
