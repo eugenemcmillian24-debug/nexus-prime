@@ -27,22 +27,20 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: Do NOT run any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
+  // Refresh the auth token on every request
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Only redirect for page routes (not API routes — those handle their own auth)
   if (
     !user &&
+    !request.nextUrl.pathname.startsWith('/api/') &&
     !request.nextUrl.pathname.startsWith('/auth') &&
-    !request.nextUrl.pathname.startsWith('/api/webhooks') &&
     request.nextUrl.pathname !== '/' &&
     request.nextUrl.pathname !== '/gallery' &&
     request.nextUrl.pathname !== '/success'
   ) {
-    // Redirect unauthenticated users to login for protected routes
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     return NextResponse.redirect(url)
