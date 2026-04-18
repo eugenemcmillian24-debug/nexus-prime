@@ -6,6 +6,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { teamId: string } }
 ) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -44,6 +45,10 @@ export async function GET(
         : null,
     }))
   );
+  } catch (error: any) {
+    console.error('GET error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 // POST /api/teams/[teamId]/members - Add member directly
@@ -51,6 +56,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { teamId: string } }
 ) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -71,4 +77,8 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
+  } catch (error: any) {
+    console.error('POST error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }

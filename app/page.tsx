@@ -76,7 +76,9 @@ export default function Page() {
       const res = await fetch("/api/projects");
       const data = await res.json();
       setProjects(data.projects || []);
-    } catch (e) {}
+    } catch (e) {
+    console.error("Caught error:", e);
+  }
   };
 
   const fetchTrainingModules = async () => {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
 
 export async function GET() {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -16,9 +17,14 @@ export async function GET() {
     .single();
 
   return NextResponse.json(credits);
+  } catch (error: any) {
+    console.error('GET error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -40,4 +46,8 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json(data);
+  } catch (error: any) {
+    console.error('POST error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }

@@ -7,6 +7,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { teamId: string } }
 ) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -88,6 +89,10 @@ export async function POST(
 
   // In production, send email with invite link containing invite.token
   return NextResponse.json(invite);
+  } catch (error: any) {
+    console.error('POST error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 // GET /api/teams/[teamId]/invites
@@ -95,6 +100,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { teamId: string } }
 ) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -107,4 +113,8 @@ export async function GET(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
+  } catch (error: any) {
+    console.error('GET error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }

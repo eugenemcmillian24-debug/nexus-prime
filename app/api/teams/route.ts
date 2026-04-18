@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/api";
 
 // POST /api/teams - Create a new team
 export async function POST(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,10 +42,15 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json(team);
+  } catch (error: any) {
+    console.error('POST error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 // GET /api/teams - List user's teams
 export async function GET() {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -67,4 +73,8 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(teams);
+  } catch (error: any) {
+    console.error('GET error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }

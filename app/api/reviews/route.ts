@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/api";
 
 // POST /api/reviews - Request a new AI code review
 export async function POST(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -167,10 +168,15 @@ Respond ONLY with valid JSON in this exact format:
     await supabase.from("code_reviews").update({ status: "failed" }).eq("id", review.id);
     return NextResponse.json({ error: "Review failed" }, { status: 500 });
   }
+  } catch (error: any) {
+    console.error('POST error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 // GET /api/reviews?projectId=...&fileId=...
 export async function GET(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -201,4 +207,8 @@ export async function GET(req: NextRequest) {
       completedAt: r.completed_at,
     }))
   );
+  } catch (error: any) {
+    console.error('GET error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }

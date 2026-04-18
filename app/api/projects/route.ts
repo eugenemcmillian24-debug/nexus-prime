@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/api";
 
 // GET /api/projects - List user's projects
 export async function GET(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -28,10 +29,15 @@ export async function GET(req: NextRequest) {
     page,
     limit,
   });
+  } catch (error: any) {
+    console.error('GET error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 // POST /api/projects - Create a new project
 export async function POST(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -93,10 +99,15 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ project }, { status: 201 });
+  } catch (error: any) {
+    console.error('POST error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 // PATCH /api/projects - Update a project
 export async function PATCH(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -123,10 +134,15 @@ export async function PATCH(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ project: data });
+  } catch (error: any) {
+    console.error('PATCH error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 // DELETE /api/projects - Delete a project
 export async function DELETE(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -145,6 +161,10 @@ export async function DELETE(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('DELETE error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 function detectLanguage(path: string): string {

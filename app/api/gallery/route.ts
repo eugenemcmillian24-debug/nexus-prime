@@ -67,6 +67,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  try {
   const supabase = createClient();
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get("page") || "1");
@@ -108,4 +109,8 @@ export async function GET(req: Request) {
     page,
     totalPages: Math.ceil((count || 0) / limit),
   });
+  } catch (error: any) {
+    console.error('GET error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }

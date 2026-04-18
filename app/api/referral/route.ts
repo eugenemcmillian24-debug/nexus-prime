@@ -85,6 +85,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -108,4 +109,8 @@ export async function GET(req: Request) {
     totalReferred: referrals?.filter((r: any) => r.status === "completed").length || 0,
     totalCreditsEarned: referrals?.reduce((sum: number, r: any) => sum + (r.credits_awarded_referrer || 0), 0) || 0,
   });
+  } catch (error: any) {
+    console.error('GET error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }

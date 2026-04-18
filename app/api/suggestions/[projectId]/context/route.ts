@@ -5,6 +5,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { projectId: string } }
 ) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,7 +30,9 @@ export async function GET(
     try {
       const parsed = JSON.parse(packageJson.content);
       dependencies = Object.keys(parsed.dependencies || {});
-    } catch (e) {}
+    } catch (e) {
+    console.error("Caught error:", e);
+  }
   }
 
   return NextResponse.json({
@@ -40,4 +43,8 @@ export async function GET(
     framework: "Next.js",
     recentChanges: [], // Mocked for now
   });
+  } catch (error: any) {
+    console.error('GET error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }

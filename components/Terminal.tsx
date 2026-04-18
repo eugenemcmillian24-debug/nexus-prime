@@ -21,7 +21,9 @@ export default function Terminal({ jobId }: { jobId: string }) {
         const res = await fetch('/api/user/agency');
         const data = await res.json();
         if (data.agency_mode) setAgencyConfig(data.agency_config);
-      } catch (e) {}
+      } catch (e) {
+    console.error("Caught error:", e);
+  }
     };
     fetchAgency();
   }, []);

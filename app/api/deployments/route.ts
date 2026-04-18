@@ -4,6 +4,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 
 // POST /api/deployments - Trigger a new deployment
 export async function POST(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -65,6 +66,10 @@ export async function POST(req: NextRequest) {
     environment: deployment.environment,
     createdAt: deployment.created_at,
   });
+  } catch (error: any) {
+    console.error('POST error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 // Async deployment handler
@@ -143,6 +148,7 @@ async function triggerVercelDeploy(
 
 // GET /api/deployments?projectId=...
 export async function GET(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -179,4 +185,8 @@ export async function GET(req: NextRequest) {
       completedAt: d.completed_at,
     }))
   );
+  } catch (error: any) {
+    console.error('GET error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }

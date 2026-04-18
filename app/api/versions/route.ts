@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/api";
 
 // GET /api/versions?project_id=xxx - List versions for a project
 export async function GET(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -49,10 +50,15 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ versions: data });
+  } catch (error: any) {
+    console.error('GET error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 // POST /api/versions - Create a new version (snapshot current files)
 export async function POST(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -133,10 +139,15 @@ export async function POST(req: NextRequest) {
     .eq("id", project_id);
 
   return NextResponse.json({ version }, { status: 201 });
+  } catch (error: any) {
+    console.error('POST error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
 
 // PUT /api/versions - Rollback to a specific version
 export async function PUT(req: NextRequest) {
+  try {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -217,4 +228,8 @@ export async function PUT(req: NextRequest) {
     message: `Rolled back to version ${version_number}`,
     new_version: nextVer,
   });
+  } catch (error: any) {
+    console.error('PUT error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
