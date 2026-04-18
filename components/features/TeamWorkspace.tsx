@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { TIER_LIMITS } from "@/lib/nexus_prime_constants";
+import Image from "next/image";
 
 interface Team {
   id: string;
@@ -439,10 +440,12 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
                             justifyContent: "center", fontSize: "16px",
                           }}>
                             {member.profile?.avatarUrl ? (
-                              <img
+                              <Image
                                 src={member.profile.avatarUrl}
                                 alt=""
-                                style={{ width: "36px", height: "36px", borderRadius: "50%" }}
+                                width={36}
+                                height={36}
+                                style={{ borderRadius: "50%" }}
                               />
                             ) : (
                               "👤"

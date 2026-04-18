@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Shield, Layout, Mail, Image as ImageIcon, Save, CheckCircle, AlertTriangle } from 'lucide-react';
+import Image from "next/image";
 
 interface AgencyConfig {
   company_name: string;
@@ -152,8 +153,8 @@ export default function AgencyWhiteLabelSettings() {
                 placeholder="https://..."
                 className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-indigo-500 outline-none"
               />
-              <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center overflow-hidden">
-                {config.logo_url ? <img src={config.logo_url} className="w-full h-full object-contain" /> : <ImageIcon size={20} className="text-zinc-600" />}
+              <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center overflow-hidden relative">
+                {config.logo_url ? <Image alt="" src={config.logo_url} className="object-contain" fill /> : <ImageIcon size={20} className="text-zinc-600" />}
               </div>
             </div>
           </div>

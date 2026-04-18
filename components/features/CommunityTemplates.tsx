@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Image from "next/image";
 
 interface Template {
   id: string;
@@ -112,7 +113,7 @@ export default function CommunityTemplates({ onFork }: { onFork: (template: Temp
             filtered.map((template) => (
               <Card key={template.id} className="bg-[#050505] border-white/5 hover:border-white/20 transition-all overflow-hidden group">
                 <div className="h-40 overflow-hidden relative">
-                  <img 
+                  <Image 
                     src={template.thumbnail} 
                     alt={template.name} 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -177,7 +178,7 @@ export default function CommunityTemplates({ onFork }: { onFork: (template: Temp
         </div>
         <div className="flex -space-x-3 overflow-hidden">
           {Array(5).fill(0).map((_, i) => (
-            <img 
+            <Image 
               key={i} 
               className="inline-block h-10 w-10 rounded-full ring-2 ring-[#050505] bg-gray-800"
               src={`https://i.pravatar.cc/100?u=${i}`}

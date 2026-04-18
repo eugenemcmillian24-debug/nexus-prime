@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Image as ImageIcon, X, UploadCloud } from "lucide-react";
+import Image from "next/image";
 
 export default function ScreenshotUpload({ onUpload }: { onUpload: (base64: string | null) => void }) {
   const [preview, setPreview] = useState<string | null>(null);
@@ -49,7 +50,7 @@ export default function ScreenshotUpload({ onUpload }: { onUpload: (base64: stri
         </label>
       ) : (
         <div className="relative group">
-          <img
+          <Image
             src={preview}
             alt="Screenshot Preview"
             className="w-10 h-10 object-cover rounded-[2px] border border-[#00ff8844]"

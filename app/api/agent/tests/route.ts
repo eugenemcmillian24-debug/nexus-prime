@@ -37,18 +37,17 @@ export async function POST(req: Request) {
 
     const testFiles = await orchestrator.generateTests(files);
 
-    // Save generated test files back to the project
-    for (const testFile of testFiles) {
-      await supabase
-        .from('project_files')
-        .upsert({
-          project_id: projectId,
-          path: testFile.path,
-          content: testFile.content,
-          language: 'typescript',
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'project_id,path' });
-    }
+    // Batch upsert all test files in a single query (avoids N+1)
+    const testFileRecords = testFiles.map((testFile: any) => ({
+      project_id: projectId,
+      path: testFile.path,
+      content: testFile.content,
+      language: 'typescript',
+      updated_at: new Date().toISOString(),
+    }));
+    await supabase
+      .from('project_files')
+      .upsert(testFileRecords, { onConflict: 'project_id,path' });
 
     return NextResponse.json({ success: true, testFiles });
 

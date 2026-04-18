@@ -5,6 +5,7 @@ import { AgentJobSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
 import { waitUntil } from '@vercel/functions';
 import { isNexusPrimeAdmin, TIER_LIMITS, PREMIUM_AGENTS } from '@/lib/nexus_prime_access';
+import { rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const maxDuration = 300; // 5 min max for orchestrator pipeline
 
@@ -17,6 +18,15 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { prompt, imageUrl, projectId, agentType, trainingModuleId } = body;
+
+    // 0. RATE LIMIT (20 requests/min per user for AI agent calls)
+    const rl = rateLimit(`agent:${userId}`, { limit: 20, windowSeconds: 60 });
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a moment." },
+        { status: 429, headers: rateLimitHeaders(rl) }
+      );
+    }
 
     // 1. DETERMINE COST
     const { data: userCredits } = await supabase
