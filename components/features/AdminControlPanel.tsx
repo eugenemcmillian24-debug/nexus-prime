@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { TIER_LIMITS, PREMIUM_AGENTS } from "@/lib/nexus_prime_access";
+import { TIER_LIMITS, PREMIUM_AGENTS } from "@/lib/nexus_prime_constants";
 
 interface EnvVar {
   key: string;

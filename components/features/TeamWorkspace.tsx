@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { TIER_LIMITS } from "@/lib/nexus_prime_access";
+import { TIER_LIMITS } from "@/lib/nexus_prime_constants";
 
 interface Team {
   id: string;
