@@ -11,6 +11,7 @@ import IterativeRefinement from "@/components/IterativeRefinement";
 import LandingPage from "@/components/LandingPage";
 import AgentTrainingLab from "@/components/features/AgentTrainingLab";
 import AgencyWhiteLabelSettings from "@/components/features/AgencyWhiteLabelSettings";
+import AppLayout from "@/components/layout/AppLayout";
 import { createClient, User, AuthChangeEvent, Session, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { NEXUS_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/templates";
 import * as Icons from "lucide-react";
