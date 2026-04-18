@@ -1,5 +1,6 @@
 import { Groq } from 'groq-sdk';
 import { createClient } from '@supabase/supabase-js';
+import { TIER_LIMITS } from './nexus_prime_constants';
 
 export interface AgentConfig {
   groqKey: string;
