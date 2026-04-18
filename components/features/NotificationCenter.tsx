@@ -25,6 +25,7 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
   system: { icon: "⚙️", color: "#737373" },
   mention: { icon: "💬", color: "#3b82f6" },
   version: { icon: "📸", color: "#8b5cf6" },
+  marketplace: { icon: "💎", color: "#00ff88" },
 };
 
 export default function NotificationCenter({ userId }: NotificationCenterProps) {

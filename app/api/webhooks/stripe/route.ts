@@ -20,6 +20,12 @@ const PRICE_TO_PLAN: Record<string, { tier: string; credits: number }> = {
   [process.env.STRIPE_ENTERPRISE_PRICE_ID!]: { tier: 'Enterprise', credits: 2000 },
 };
 
+const TOPUP_PRICE_TO_CREDITS: Record<string, number> = {
+  [process.env.STRIPE_TOPUP_50_PRICE_ID!]: 50,
+  [process.env.STRIPE_TOPUP_250_PRICE_ID!]: 250,
+  [process.env.STRIPE_TOPUP_1000_PRICE_ID!]: 1000,
+};
+
 export async function POST(req: Request) {
   const body = await req.text();
   const sig = req.headers.get('stripe-signature');
@@ -35,29 +41,25 @@ export async function POST(req: Request) {
 
   try {
     switch (event.type) {
-      // ── Checkout completed ────────────────────────────────
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const { userId, credits, tier } = session.metadata || {};
+        const { userId, credits, type, tier } = session.metadata || {};
 
         if (!userId || !credits) {
           console.error('Missing metadata on checkout session:', session.id);
           break;
         }
 
-        // Store Stripe customer ID
+        // 1. Update Customer ID
         if (session.customer) {
           await supabase
             .from('user_credits')
-            .update({
-              stripe_customer_id: session.customer as string,
-              stripe_subscription_id: session.subscription as string,
-            })
+            .update({ stripe_customer_id: session.customer as string })
             .eq('user_id', userId);
         }
 
-        // Log subscription in subscriptions table
-        if (session.subscription) {
+        // 2. Handle Subscription specific logic
+        if (type === 'subscription' && session.subscription) {
           const sub = await stripe.subscriptions.retrieve(session.subscription as string);
           await supabase.from('subscriptions').upsert({
             user_id: userId,
@@ -70,23 +72,23 @@ export async function POST(req: Request) {
             current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
             cancel_at_period_end: sub.cancel_at_period_end,
           }, { onConflict: 'stripe_subscription_id' });
+
+          // Update tier in user_credits
+          await supabase
+            .from('user_credits')
+            .update({ tier, stripe_subscription_id: sub.id })
+            .eq('user_id', userId);
         }
 
-        // Log purchase (triggers auto credit add via DB trigger)
-        await supabase.from('credit_purchases').insert({
-          user_id: userId,
-          amount_usd: (session.amount_total || 0) / 100,
-          credits_added: parseInt(credits),
-          stripe_payment_intent_id: session.payment_intent as string || session.id,
-          stripe_subscription_id: session.subscription as string,
-          status: 'succeeded',
+        // 3. Grant Credits (Atomic via RPC)
+        const description = type === 'subscription' ? `Plan Upgrade: ${tier}` : `Top-up: ${credits} CR`;
+        await supabase.rpc('add_user_credits', {
+          target_user_id: userId,
+          amount_to_add: parseInt(credits),
+          transaction_type: 'purchase',
+          transaction_desc: description,
+          session_id: session.id
         });
-
-        // Update tier
-        await supabase
-          .from('user_credits')
-          .update({ tier })
-          .eq('user_id', userId);
 
         break;
       }

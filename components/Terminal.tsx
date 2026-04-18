@@ -12,7 +12,19 @@ const supabase = (typeof window !== 'undefined' && supabaseUrl && supabaseKey)
 
 export default function Terminal({ jobId }: { jobId: string }) {
   const [events, setEvents] = useState<any[]>([]);
+  const [agencyConfig, setAgencyConfig] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchAgency = async () => {
+      try {
+        const res = await fetch('/api/user/agency');
+        const data = await res.json();
+        if (data.agency_mode) setAgencyConfig(data.agency_config);
+      } catch (e) {}
+    };
+    fetchAgency();
+  }, []);
 
   useEffect(() => {
     if (!supabase || !jobId) return;
@@ -65,17 +77,24 @@ export default function Terminal({ jobId }: { jobId: string }) {
         <div className="w-3 h-3 rounded-full bg-red-500/50" />
         <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
         <div className="w-3 h-3 rounded-full bg-[#00ff88]/50" />
-        <span className="text-[#888] ml-2 text-xs">NEXUS PRIME ORCHESTRATOR v1.0.4</span>
+        <span className="text-[#888] ml-2 text-xs">{agencyConfig?.hide_nexus_logs ? (agencyConfig.company_name || 'AI ORCHESTRATOR').toUpperCase() : 'NEXUS PRIME ORCHESTRATOR v1.0.4'}</span>
       </div>
       
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
-        {events && Array.isArray(events) && events.map((event, i) => (
-          <div key={i} className="animate-in fade-in slide-in-from-left-2 duration-300">
-            <span className="text-[#00ff88] mr-2">[{((event?.agent_name as string) || 'SYSTEM').split('-')[0].toUpperCase()}]</span>
-            <span className="text-[#888] mr-2">({event?.event_type || 'info'}):</span>
-            <span className="text-white leading-relaxed">{event?.content || ''}</span>
-          </div>
-        ))}
+        {events && Array.isArray(events) && events.map((event, i) => {
+          let content = event?.content || '';
+          if (agencyConfig?.hide_nexus_logs) {
+            const agencyName = agencyConfig.company_name || 'Agent';
+            content = content.replace(/NEXUS PRIME/g, agencyName).replace(/Nexus Prime/g, agencyName);
+          }
+          return (
+            <div key={i} className="animate-in fade-in slide-in-from-left-2 duration-300">
+              <span className="text-[#00ff88] mr-2">[{((event?.agent_name as string) || 'SYSTEM').split('-')[0].toUpperCase()}]</span>
+              <span className="text-[#888] mr-2">({event?.event_type || 'info'}):</span>
+              <span className="text-white leading-relaxed">{content}</span>
+            </div>
+          );
+        })}
         {(!events || events.length === 0) && (
           <div className="text-[#444] italic">Waiting for agent initialization...</div>
         )}

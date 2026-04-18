@@ -9,11 +9,13 @@ import ScreenshotUpload from "@/components/ScreenshotUpload";
 import ProjectHistory from "@/components/ProjectHistory";
 import IterativeRefinement from "@/components/IterativeRefinement";
 import LandingPage from "@/components/LandingPage";
+import AgentTrainingLab from "@/components/features/AgentTrainingLab";
+import AgencyWhiteLabelSettings from "@/components/features/AgencyWhiteLabelSettings";
 import { createClient, User, AuthChangeEvent, Session, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { NEXUS_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/templates";
 import * as Icons from "lucide-react";
 import Link from "next/link";
-import { isNexusPrimeAdmin } from "@/lib/nexus_prime_access";
+import { PREMIUM_AGENTS } from "@/lib/nexus_prime_constants";
 
 const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
@@ -33,12 +35,23 @@ export default function Page() {
   const [showPricing, setShowPricing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showProjectHistory, setShowProjectHistory] = useState(false);
+  const [showTrainingLab, setShowTrainingLab] = useState(false);
+  const [showAgencySettings, setShowAgencySettings] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [templateCategory, setTemplateCategory] = useState("all");
+  const [selectedAgentType, setSelectedAgentType] = useState("builder");
+  const [selectedTrainingModuleId, setSelectedTrainingModuleId] = useState<string | null>(null);
+  const [trainingModules, setTrainingModules] = useState<any[]>([]);
 
   useEffect(() => {
-    isNexusPrimeAdmin().then(setIsAdmin);
-  }, []);
+    if (user) {
+      const isAdmin = user.app_metadata?.role === 'admin' || user.user_metadata?.is_admin === true;
+      const superuserEmails = ['eugenemcmillian24@gmail.com'];
+      setIsAdmin(isAdmin || superuserEmails.includes(user.email || ''));
+    } else {
+      setIsAdmin(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -57,16 +70,15 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (user) {
+      fetchTrainingModules();
+    }
+  }, [user]);
 
-    const fetchUserData = async () => {
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      const { data: creditData } = await supabase.from('user_credits').select('*').eq('user_id', user.id).single();
-      setProfile(profileData);
-      setCredits(creditData);
-    };
-
-    fetchUserData();
+  const fetchTrainingModules = async () => {
+    const { data } = await supabase.from('agent_training_modules').select('*').eq('user_id', user?.id).order('created_at', { ascending: false });
+    setTrainingModules(data || []);
+  };
 
     const channel = supabase
       .channel(`credits-${user.id}`)
@@ -116,7 +128,13 @@ export default function Page() {
       const response = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, userId: user.id, imageUrl }),
+        body: JSON.stringify({ 
+          prompt, 
+          userId: user.id, 
+          imageUrl, 
+          agentType: selectedAgentType, 
+          trainingModuleId: selectedTrainingModuleId 
+        }),
       });
 
       const data = await response.json();
@@ -137,21 +155,24 @@ export default function Page() {
     }
   };
 
-  const handleCheckout = async (tier: string) => {
-    if (!user) return;
+  const handleCheckout = async (type: 'subscription' | 'topup', id: string) => {
     try {
-      const response = await fetch("/api/billing/checkout", {
+      const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, tier }),
+        body: JSON.stringify({ 
+          type, 
+          tier: type === 'subscription' ? id : undefined,
+          packId: type === 'topup' ? id : undefined
+        }),
       });
-      const data = await response.json();
+      const data = await res.json();
       if (data.url) window.location.href = data.url;
-    } catch (e) {
-      console.error(e);
-      alert("Failed to initiate checkout.");
+    } catch (err) {
+      console.error("Checkout failed:", err);
     }
   };
+
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -187,43 +208,55 @@ export default function Page() {
   if (!user) return <LandingPage />;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#888] font-mono p-8 selection:bg-[#00ff8822] selection:text-[#00ff88]">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-[#050505] text-[#888] font-mono p-4 md:p-8 selection:bg-[#00ff8822] selection:text-[#00ff88]">
+      <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
         {/* Header */}
-        <header className="flex justify-between items-center border-b border-[#1a1a1a] pb-4">
-          <div className="flex items-center gap-3">
+        <header className="flex flex-col md:flex-row justify-between items-center border-b border-[#1a1a1a] pb-4 gap-4">
+          <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="w-8 h-8 bg-[#00ff88] rounded-sm flex items-center justify-center text-black font-bold">N</div>
             <h1 className="text-xl font-bold tracking-tighter text-white uppercase tracking-widest">Nexus Prime</h1>
           </div>
-          <div className="flex gap-4 text-xs uppercase tracking-widest items-center">
+          <div className="flex flex-wrap gap-3 md:gap-4 text-[9px] md:text-xs uppercase tracking-widest items-center justify-center md:justify-end">
             <Link href="/dashboard" className="text-[#444] hover:text-white transition-all">
               [ Dashboard ]
             </Link>
             <Link href="/gallery" className="text-[#444] hover:text-white transition-all">
               [ Gallery ]
             </Link>
-            <button 
-              onClick={() => { setShowProjectHistory(!showProjectHistory); setShowHistory(false); setShowPricing(false); }} 
+            <button
+              onClick={() => { setShowProjectHistory(!showProjectHistory); setShowHistory(false); setShowPricing(false); }}
               className={`hover:text-white transition-all ${showProjectHistory ? 'text-white' : 'text-[#444]'}`}
             >
               [ Builds ]
             </button>
-            <button 
-              onClick={() => { setShowHistory(!showHistory); setShowProjectHistory(false); setShowPricing(false); }} 
+            <button
+              onClick={() => { setShowHistory(!showHistory); setShowProjectHistory(false); setShowPricing(false); }}
               className={`hover:text-white transition-all ${showHistory ? 'text-white' : 'text-[#444]'}`}
             >
               [ Credits ]
             </button>
-            <button 
-              onClick={() => { setShowPricing(!showPricing); setShowHistory(false); setShowProjectHistory(false); }} 
+            <button
+              onClick={() => { setShowTrainingLab(!showTrainingLab); setShowProjectHistory(false); setShowHistory(false); setShowPricing(false); setShowAgencySettings(false); }}
+              className={`hover:text-white transition-all ${showTrainingLab ? 'text-white' : 'text-[#444]'}`}
+            >
+              [ Training Lab ]
+            </button>
+            <button
+              onClick={() => { setShowAgencySettings(!showAgencySettings); setShowTrainingLab(false); setShowProjectHistory(false); setShowHistory(false); setShowPricing(false); }}
+              className={`hover:text-indigo-400 transition-all ${showAgencySettings ? 'text-indigo-400' : 'text-[#444]'}`}
+            >
+              [ Agency ]
+            </button>
+            <button
+              onClick={() => { setShowPricing(!showPricing); setShowHistory(false); setShowProjectHistory(false); setShowTrainingLab(false); }}
               className="text-[#00ff88] hover:underline transition-all"
             >
               [ Buy Credits ]
             </button>
-            <div className="text-white font-bold">
+            <div className="text-white font-bold whitespace-nowrap">
               {isAdmin ? 'ADMIN: ∞ CR' : `${credits?.tier || 'Starter'}: ${credits?.balance || 0} CR`}
             </div>
-            <button 
+            <button
               onClick={handleLogout}
               className="text-[#444] hover:text-[#ff4444] transition-all"
             >
@@ -232,35 +265,109 @@ export default function Page() {
           </div>
         </header>
 
-        {/* Pricing Section Overlay */}
-        {showPricing && (
-          <div className="bg-[#0a0a0a] border border-[#00ff8844] p-8 animate-in zoom-in-95 duration-300">
+
+        {/* Agency White-Label Overlay */}
+        {showAgencySettings && (
+          <div className="bg-[#0a0a0a] border border-indigo-500/44 p-4 md:p-8 animate-in zoom-in-95 duration-300">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-[#00ff88] text-lg font-bold tracking-widest uppercase">Select Tier</h2>
+              <h2 className="text-indigo-400 text-lg font-bold tracking-widest uppercase">Agency White-Label</h2>
+              <button onClick={() => setShowAgencySettings(false)} className="text-[#444] hover:text-white">✕</button>
+            </div>
+            <AgencyWhiteLabelSettings />
+          </div>
+        )}
+        {showTrainingLab && (
+          <div className="bg-[#0a0a0a] border border-[#00ff8844] p-4 md:p-8 animate-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-[#00ff88] text-lg font-bold tracking-widest uppercase">Training Lab</h2>
+              <button onClick={() => setShowTrainingLab(false)} className="text-[#444] hover:text-white">✕</button>
+            </div>
+            <AgentTrainingLab />
+          </div>
+        )}
+        {showPricing && (
+          <div className="bg-[#0a0a0a] border border-[#00ff8844] p-4 md:p-8 animate-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-[#00ff88] text-lg font-bold tracking-widest uppercase">Monetization Hub</h2>
               <button onClick={() => setShowPricing(false)} className="text-[#444] hover:text-white">✕</button>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { name: "Starter", price: "$9", credits: 100, desc: "Individual Builders" },
-                { name: "PRO", price: "$29", credits: 500, desc: "Power Users" },
-                { name: "Enterprise", price: "$99", credits: 2000, desc: "Scale Fast" },
-              ].map((tier) => (
-                <div key={tier.name} className="border border-[#1a1a1a] p-6 space-y-4 hover:border-[#00ff8844] transition-all group">
-                  <div className="text-xs text-[#444] tracking-[0.2em]">{tier.name}</div>
-                  <div className="text-2xl text-white font-bold">{tier.price}<span className="text-xs font-normal text-[#444]">/mo</span></div>
-                  <div className="text-[#00ff88] text-xs font-bold">{tier.credits} CREDITS</div>
-                  <div className="text-[10px] text-[#444] leading-relaxed uppercase">{tier.desc}</div>
-                  <button 
-                    onClick={() => handleCheckout(tier.name)}
-                    className="w-full bg-[#111] border border-[#1a1a1a] py-2 text-[10px] uppercase font-bold text-white group-hover:bg-[#00ff88] group-hover:text-black transition-all"
-                  >
-                    Select Plan
-                  </button>
+
+            <div className="space-y-8">
+              {/* Subscriptions */}
+              <div className="space-y-4">
+                <h3 className="text-white text-xs font-bold uppercase tracking-widest border-b border-white/5 pb-2">Subscription Tiers</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { name: "Starter", price: "$9", credits: 100, desc: "Individual Builders" },
+                    { name: "PRO", price: "$29", credits: 500, desc: "Power Users" },
+                    { name: "Enterprise", price: "$99", credits: 2000, desc: "Scale Fast" },
+                  ].map((tier) => (
+                    <div key={tier.name} className="border border-[#1a1a1a] p-6 space-y-4 hover:border-[#00ff8844] transition-all group">
+                      <div className="text-xs text-[#444] tracking-[0.2em]">{tier.name}</div>
+                      <div className="text-2xl text-white font-bold">{tier.price}<span className="text-xs font-normal text-[#444]">/mo</span></div>
+                      <div className="text-[#00ff88] text-xs font-bold">{tier.credits} CREDITS</div>
+                      <div className="text-[10px] text-[#444] leading-relaxed uppercase">{tier.desc}</div>
+                      <button
+                        onClick={() => handleCheckout('subscription', tier.name)}
+                        className="w-full bg-[#111] border border-[#1a1a1a] py-2 text-[10px] uppercase font-bold text-white group-hover:bg-[#00ff88] group-hover:text-black transition-all"
+                      >
+                        Select Plan
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              {/* Credit Top-ups */}
+              <div className="space-y-4">
+                <h3 className="text-white text-xs font-bold uppercase tracking-widest border-b border-white/5 pb-2">Credit Top-ups</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { id: "pack_50", price: "$5", credits: 50, desc: "Quick Build" },
+                    { id: "pack_250", price: "$15", credits: 250, desc: "Most Popular" },
+                    { id: "pack_1000", price: "$45", credits: 1000, desc: "Power Pack" },
+                  ].map((pack) => (
+                    <div key={pack.id} className="border border-[#1a1a1a] p-6 space-y-4 hover:border-[#00ff8844] transition-all group">
+                      <div className="text-xs text-[#444] tracking-[0.2em]">ONE-TIME</div>
+                      <div className="text-2xl text-white font-bold">{pack.price}</div>
+                      <div className="text-emerald-400 text-xs font-bold">{pack.credits} CREDITS</div>
+                      <div className="text-[10px] text-[#444] leading-relaxed uppercase">{pack.desc}</div>
+                      <button
+                        onClick={() => handleCheckout('topup', pack.id)}
+                        className="w-full bg-[#111] border border-[#1a1a1a] py-2 text-[10px] uppercase font-bold text-white group-hover:bg-emerald-500 group-hover:text-black transition-all"
+                      >
+                        Buy Now
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Premium Agents */}
+              <div className="space-y-4">
+                <h3 className="text-white text-xs font-bold uppercase tracking-widest border-b border-white/5 pb-2">Premium Agent Access</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {PREMIUM_AGENTS.map((agent) => (
+                    <div key={agent.id} className="border border-[#1a1a1a] p-6 space-y-3 bg-[#050505] relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-2 opacity-10">
+                        <Icons.Zap size={40} />
+                      </div>
+                      <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Specialist</div>
+                      <div className="text-sm font-bold text-white leading-tight">{agent.name}</div>
+                      <p className="text-[9px] text-[#444] leading-relaxed">{agent.description}</p>
+                      <div className="flex items-center justify-between mt-4">
+                        <span className="text-[10px] font-mono text-[#666]">{agent.cost} CR / run</span>
+                        <button className="text-[9px] font-bold text-emerald-500 hover:underline">ACTIVATE</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
+
+
 
         {/* Credit History Section Overlay */}
         {showHistory && (
@@ -289,29 +396,29 @@ export default function Page() {
         )}
 
         {/* Input Section */}
-        {!jobId && !showPricing && !showHistory && !showProjectHistory ? (
+        {!jobId && !showPricing && !showHistory && !showProjectHistory && !showTrainingLab && !showAgencySettings ? (
           <div className="space-y-8 animate-in fade-in duration-500">
-            {/* Templates Section (Feature 3 - Enhanced) */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="text-xs uppercase tracking-widest text-[#444]">Seed Templates</div>
-                {/* Category Filter */}
-                <div className="flex items-center gap-1">
-                  {TEMPLATE_CATEGORIES.map((cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => setTemplateCategory(cat.id)}
-                      className={`px-2 py-1 text-[9px] uppercase tracking-wider rounded-sm transition-colors ${
-                        templateCategory === cat.id
-                          ? "bg-[#00ff88]/10 text-[#00ff88]"
-                          : "text-[#333] hover:text-[#666]"
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+        {/* Templates Section (Feature 3 - Enhanced) */}
+        <div className="space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+            <div className="text-xs uppercase tracking-widest text-[#444]">Seed Templates</div>
+            {/* Category Filter */}
+            <div className="flex flex-wrap items-center gap-1">
+              {TEMPLATE_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setTemplateCategory(cat.id)}
+                  className={`px-2 py-1 text-[9px] uppercase tracking-wider rounded-sm transition-colors ${
+                    templateCategory === cat.id
+                      ? "bg-[#00ff88]/10 text-[#00ff88]"
+                      : "text-[#333] hover:text-[#666]"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {filteredTemplates.map((template) => {
                   const Icon = (Icons as any)[template.icon] || Icons.FileCode;
@@ -334,6 +441,33 @@ export default function Page() {
             </div>
 
             <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div className="text-xs uppercase tracking-widest text-[#444]">Agent Configuration</div>
+                <div className="flex gap-4">
+                  <select 
+                    value={selectedAgentType} 
+                    onChange={(e) => setSelectedAgentType(e.target.value)}
+                    className="bg-[#111] border border-[#1a1a1a] text-[9px] uppercase tracking-widest text-white px-3 py-1 outline-none focus:border-[#00ff88]/50"
+                  >
+                    <option value="builder">Standard Builder (Base Cost)</option>
+                    {PREMIUM_AGENTS.map(agent => (
+                      <option key={agent.id} value={agent.id}>{agent.name} ({agent.cost} CR)</option>
+                    ))}
+                  </select>
+
+                  <select 
+                    value={selectedTrainingModuleId || ""} 
+                    onChange={(e) => setSelectedTrainingModuleId(e.target.value || null)}
+                    className="bg-[#111] border border-[#1a1a1a] text-[9px] uppercase tracking-widest text-white px-3 py-1 outline-none focus:border-[#00ff88]/50"
+                  >
+                    <option value="">Default Training</option>
+                    {trainingModules.map(module => (
+                      <option key={module.id} value={module.id}>{module.name} (+5 CR)</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="flex justify-between items-end">
                 <div className="text-xs uppercase tracking-widest text-[#444]">System Prompt Input</div>
                 <div className="flex items-center gap-4">
@@ -390,12 +524,12 @@ export default function Page() {
         )}
 
         {/* Footer */}
-        <footer className="pt-8 border-t border-[#1a1a1a] text-[10px] uppercase tracking-[0.2em] text-[#333] flex justify-between">
-          <div className="flex gap-4">
-            <span>Multi-Agent AI Builder System</span>
+        <footer className="pt-8 border-t border-[#1a1a1a] text-[10px] uppercase tracking-[0.2em] text-[#333] flex flex-col md:flex-row justify-between gap-4">
+          <div className="flex flex-col md:flex-row gap-2 md:gap-4">
+            <span>{credits?.agency_mode && credits?.agency_config?.company_name ? credits.agency_config.company_name : 'Multi-Agent AI Builder System'}</span>
             <span className="text-[#111]">UID: {user.id.slice(0, 8)}...</span>
           </div>
-          <span>© 2026 NEXUS PRIME CORP</span>
+          <span>© 2026 {credits?.agency_mode && credits?.agency_config?.company_name ? credits.agency_config.company_name.toUpperCase() : 'NEXUS PRIME CORP'}</span>
         </footer>
       </div>
     </div>

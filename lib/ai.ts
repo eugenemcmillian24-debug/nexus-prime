@@ -194,6 +194,45 @@ const SHIELD_MODE_SYSTEM_PROMPT = `
 ...
 `.trim();
 
+const MARKETING_PSY_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Marketing Psychology Agent. Your goal is to optimize the UI for conversion, engagement, and user retention.
+Use principles like:
+1. SCARCITY & URGENCY: Implement countdowns, limited stock indicators, or exclusive offer badges.
+2. SOCIAL PROOF: Add testimonials, user count badges, or "trusted by" logos.
+3. COGNITIVE EASE: Ensure clear call-to-actions (CTAs), minimal friction in forms, and intuitive navigation.
+4. VISUAL HIERARCHY: Use size, color, and contrast to guide the user's eye to primary actions.
+5. LOSS AVERSION: Frame offers in terms of what the user might lose if they don't act.
+
+STACK: Next.js 14, Tailwind CSS, TypeScript.
+OUTPUT: Return ONLY a JSON object with the optimized files.
+`.trim();
+
+const SECURITY_GURU_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Security Guru. Your goal is to perform deep penetration testing and security hardening on the generated code.
+Focus on:
+1. OWASP TOP 10: Mitigate XSS, SQL Injection, CSRF, and Broken Access Control.
+2. DATA SANITIZATION: Ensure all user inputs are properly validated and sanitized.
+3. SECURE HEADERS: Implement CSP, HSTS, and X-Frame-Options.
+4. RBAC: Ensure strict Role-Based Access Control on all server actions and API routes.
+5. SECURE STORAGE: Use HttpOnly cookies and encrypted storage for sensitive data.
+
+STACK: Next.js 14, Supabase, TypeScript.
+OUTPUT: Return ONLY a JSON object with the secured files.
+`.trim();
+
+const SEO_ARCHITECT_SYSTEM_PROMPT = `
+You are the NEXUS PRIME SEO Architect. Your goal is to ensure the application ranks at the top of search results.
+Focus on:
+1. METADATA: Generate dynamic title tags, meta descriptions, and OpenGraph tags for every page.
+2. SCHEMA.ORG: Implement JSON-LD structured data (Product, Organization, Article, Breadcrumb).
+3. SEMANTIC HTML: Use proper heading structures (H1-H6) and alt text for all images.
+4. CORE WEB VITALS: Optimize for LCP, FID, and CLS.
+5. SITEMAP & ROBOTS: Generate sitemap.xml and robots.txt.
+
+STACK: Next.js 14, TypeScript.
+OUTPUT: Return ONLY a JSON object with the SEO-optimized files.
+`.trim();
+
 const TEST_GENERATOR_SYSTEM_PROMPT = `
 ...
 `.trim();
@@ -264,12 +303,36 @@ export class NexusOrchestrator {
    * 4. Coder (Llama-8B) -> Execution / Code Generation
    * 5. Linter (Llama-70B) -> Quality Assurance
    */
-  async executeJob(jobId: string) {
-    const { data: job } = await this.supabase.from('agent_jobs').select('*').eq('id', jobId).single();
+  async executeJob(jobId: string, options?: { isUnthrottled?: boolean }) {
+    const { data: job } = await this.supabase
+      .from('agent_jobs')
+      .select('*, agent_training_modules(system_prompt), user_credits(agency_mode, agency_config, tier)')
+      .eq('id', jobId)
+      .single();
+    
     if (!job) return;
+
+    const isUnthrottled = options?.isUnthrottled || process.env.NEXUS_UNTHROTTLED_BUILD === 'true';
+    const customSystemPrompt = job.agent_training_modules?.system_prompt || '';
+    const isAgencyMode = job.user_credits?.agency_mode || false;
+    const agencyConfig = job.user_credits?.agency_config || {};
+    const userTier = job.user_credits?.tier || 'Free';
+    const isPriority = (TIER_LIMITS as any)[userTier]?.priorityCompute || false;
 
     try {
       await this.supabase.from('agent_jobs').update({ status: 'running' }).eq('id', jobId);
+
+      if (isUnthrottled) {
+        await this.logEvent(jobId, 'system', 'status', 'UNTHROTTLED BUILD PIPELINE ACTIVE');
+      }
+
+      if (isAgencyMode) {
+        await this.logEvent(jobId, 'system', 'status', 'AGENCY WHITE-LABEL MODE ACTIVE');
+      }
+
+      if (isPriority) {
+        await this.logEvent(jobId, 'system', 'status', 'PRIORITY COMPUTE QUEUE ACTIVE (Faster Models)');
+      }
 
       let visualAnalysis = '';
       
@@ -280,13 +343,14 @@ export class NexusOrchestrator {
         await this.logEvent(jobId, 'gemini-2.0-flash', 'completion', visualAnalysis);
       }
 
-      // STEP 1: REASONING (Qwen3-32B — replaced deprecated DeepSeek-R1)
-      await this.logEvent(jobId, 'qwen3-32b', 'thought', 'Initializing deep reasoning...');
-      const reasoning = await this.callGroq('qwen/qwen3-32b', [
+      // STEP 1: REASONING (Qwen3-32B or Llama-70B for priority)
+      const reasoningModel = isPriority ? 'llama-3.3-70b-versatile' : 'qwen/qwen3-32b';
+      await this.logEvent(jobId, reasoningModel, 'thought', `Initializing deep reasoning (${isPriority ? 'High Compute' : 'Standard'})...`);
+      const reasoning = await this.callGroq(reasoningModel, [
         { role: 'system', content: 'You are the Reasoner. Break down the user prompt and visual analysis into a logical architecture.' },
         { role: 'user', content: `Prompt: ${job.prompt}\nVisual Analysis: ${visualAnalysis}` }
       ]);
-      await this.logEvent(jobId, 'qwen3-32b', 'completion', reasoning);
+      await this.logEvent(jobId, reasoningModel, 'completion', reasoning);
 
       // STEP 2: ORCHESTRATION (Llama-70B)
       await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'thought', 'Generating execution plan based on reasoning...');
@@ -296,10 +360,41 @@ export class NexusOrchestrator {
       ]);
       await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'completion', plan);
 
-      // STEP 3: CODING (Llama-8B) - MULTI-FILE JSON
-      await this.logEvent(jobId, 'llama-3.1-8b-instant', 'thought', 'Writing multi-file code structure...');
-      const coderResponse = await this.callGroq('llama-3.1-8b-instant', [
-        { role: 'system', content: CODER_SYSTEM_PROMPT },
+      // STEP 3: CODING (Llama-8B or Llama-70B for priority) - MULTI-FILE JSON
+      const codingModel = isPriority ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant';
+      await this.logEvent(jobId, codingModel, 'thought', `Writing multi-file code structure (${isPriority ? 'Ultra Quality' : 'Instant'})...`);
+      
+      let systemPrompt = CODER_SYSTEM_PROMPT;
+      
+      // Handle Premium Agents
+      if (job.agent_type === 'marketing-psy') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${MARKETING_PSY_SYSTEM_PROMPT}`;
+      if (job.agent_type === 'security-guru') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${SECURITY_GURU_SYSTEM_PROMPT}`;
+      if (job.agent_type === 'seo-architect') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${SEO_ARCHITECT_SYSTEM_PROMPT}`;
+      
+      // Apply Custom Training Module
+      if (customSystemPrompt) {
+        systemPrompt = `${systemPrompt}\n\nCUSTOM INSTRUCTIONS:\n${customSystemPrompt}`;
+      }
+
+      if (isAgencyMode) {
+        const agencyName = agencyConfig.company_name || "Custom AI Solutions";
+        systemPrompt = systemPrompt.replace(/NEXUS PRIME/g, agencyName).replace(/Nexus Prime/g, agencyName);
+        
+        let whiteLabelInstructions = `\n\nWHITE-LABEL RULE: Do NOT include any branding, comments, or references to "Nexus Prime" or "Skywork". Use the name "${agencyName}" if needed.`;
+        
+        if (agencyConfig.footer_html) {
+          whiteLabelInstructions += `\nINJECT FOOTER: Always include this HTML footer at the bottom of the main layout/page: ${agencyConfig.footer_html}`;
+        }
+        
+        if (agencyConfig.support_email) {
+          whiteLabelInstructions += `\nSUPPORT CONTACT: Use "${agencyConfig.support_email}" for any contact/support links.`;
+        }
+
+        systemPrompt = `${systemPrompt}${whiteLabelInstructions}`;
+      }
+
+      const coderResponse = await this.callGroq(codingModel, [
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: `Plan: ${plan}` }
       ]);
       

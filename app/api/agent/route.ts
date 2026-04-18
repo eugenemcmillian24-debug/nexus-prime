@@ -4,7 +4,7 @@ import { NexusOrchestrator } from '@/lib/ai';
 import { AgentJobSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
 import { waitUntil } from '@vercel/functions';
-import { isNexusPrimeAdmin } from '@/lib/nexus_prime_access';
+import { isNexusPrimeAdmin, TIER_LIMITS, PREMIUM_AGENTS } from '@/lib/nexus_prime_access';
 
 export const maxDuration = 300; // 5 min max for orchestrator pipeline
 
@@ -16,14 +16,26 @@ export async function POST(req: Request) {
     const userId = user.id;
 
     const body = await req.json();
+    const { prompt, imageUrl, projectId, agentType, trainingModuleId } = body;
 
-    // 1. INPUT VALIDATION (Zod Hardening)
-    // We ensure the userId used is the authenticated one
-    const { prompt, imageUrl, projectId } = AgentJobSchema.parse({
-      ...body,
-      userId: user.id
-    });
+    // 1. DETERMINE COST
+    const { data: userCredits } = await supabase
+      .from("user_credits")
+      .select("tier")
+      .eq("user_id", userId)
+      .single();
+    
+    const tier = userCredits?.tier || 'Free';
+    const baseCost = (TIER_LIMITS as any)[tier]?.buildCost ?? 10;
+    
+    // Check if it's a premium agent
+    const premiumAgent = PREMIUM_AGENTS.find(a => a.id === agentType);
+    let totalCost = premiumAgent ? premiumAgent.cost : baseCost;
 
+    // Custom Training Module Surcharge
+    if (trainingModuleId) {
+      totalCost += 5;
+    }
 
     // 2. NEXUS GUARD: Atomic Credit Deduction
     const isAdmin = await isNexusPrimeAdmin();
@@ -32,7 +44,7 @@ export async function POST(req: Request) {
     if (!isAdmin) {
       const { data: rpcResult, error: rpcError } = await supabase.rpc('deduct_user_credits', {
         target_user_id: userId,
-        amount_to_deduct: 10
+        amount_to_deduct: totalCost
       });
       
       if (rpcError || !rpcResult.success) {
@@ -50,21 +62,21 @@ export async function POST(req: Request) {
       .insert({
         user_id: userId,
         status: 'pending',
-        agent_type: 'builder',
+        agent_type: agentType || 'builder',
         prompt,
         image_url: imageUrl,
         project_id: projectId,
-        credits_cost: 10
+        credits_cost: totalCost,
+        training_module_id: trainingModuleId || null
       })
       .select()
       .single();
 
     if (jobError) {
-      // Refund if job creation fails (only if not admin)
       if (!isAdmin) {
         await supabase.rpc('deduct_user_credits', {
           target_user_id: userId,
-          amount_to_deduct: -10
+          amount_to_deduct: -totalCost
         });
       }
       throw jobError;
@@ -79,7 +91,7 @@ export async function POST(req: Request) {
       supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
     });
 
-    waitUntil(orchestrator.executeJob(job.id));
+    waitUntil(orchestrator.executeJob(job.id, { isUnthrottled: isAdmin }));
 
     return NextResponse.json({ jobId: job.id, newBalance: result.new_balance });
 

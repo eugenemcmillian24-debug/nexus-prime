@@ -1,4 +1,8 @@
+import 'server-only';
 import { createClient } from './supabase/server';
+import { TIER_LIMITS, PREMIUM_AGENTS } from './nexus_prime_constants';
+
+export { TIER_LIMITS, PREMIUM_AGENTS };
 
 /**
  * NEXUS PRIME Superuser & Admin Logic
@@ -12,14 +16,14 @@ export async function isNexusPrimeAdmin() {
   if (!user) return false;
 
   // Check for admin role in metadata or a specific admin list
-  // The user can be manually flagged as 'admin' in Supabase Auth user_metadata
   const isAdmin = user.app_metadata?.role === 'admin' || user.user_metadata?.is_admin === true;
-  
-  // Also, for the current setup, we can define a list of "Superuser" IDs
-  const superuserEmails = ['admin@nexus-prime.ai', 'eugenemcmillian24@gmail.com']; // Placeholder for user's email if known, or just allow based on key
-  
-  return isAdmin || superuserEmails.includes(user.email || '');
+
+  // STRICT ADMIN CONTROL: Only this email gets free access
+  const superuserEmails = ['eugenemcmillian24@gmail.com']; 
+
+  return superuserEmails.includes(user.email || '');
 }
+
 
 export async function hasNexusPrimeFreeAccess() {
   const isAdmin = await isNexusPrimeAdmin();
@@ -46,10 +50,22 @@ export async function getNexusPrimeCredits() {
   if (!user) return 0;
 
   const { data: profile } = await supabase
-    .from('profiles')
-    .select('credits')
-    .eq('id', user.id)
+    .from('user_credits')
+    .select('balance')
+    .eq('user_id', user.id)
     .single();
 
-  return profile?.credits || 0;
+  return profile?.balance || 0;
+}
+
+export async function getTeamSeatLimit(userId: string, tier: string) {
+  const supabase = createClient();
+  const { data: profile } = await supabase
+    .from('user_credits')
+    .select('seat_limit_override')
+    .eq('user_id', userId)
+    .single();
+
+  if (profile?.seat_limit_override) return profile.seat_limit_override;
+  return (TIER_LIMITS as any)[tier]?.seats || 1;
 }

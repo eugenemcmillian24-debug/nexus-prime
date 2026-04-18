@@ -18,59 +18,78 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    // 1. INPUT VALIDATION (Zod Hardening)
-    // We ensure the userId used is the authenticated one
-    const { tier } = CheckoutSchema.parse({ ...body, userId: user.id });
+    // 1. INPUT VALIDATION
+    // Support for both 'subscription' and 'topup' modes
+    const { type, tier, packId } = body; 
 
     // 2. CHECK ADMIN/SUPERUSER BYPASS
     const isAdmin = await isNexusPrimeAdmin();
     if (isAdmin) {
-      // For Admins, we don't create a Stripe session, just return a "Direct Upgrade"
-      // We can handle this logic in the frontend or just return a special URL
       return NextResponse.json({ 
         url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?status=admin_upgrade`,
         message: 'Admin status detected. Unlimited build credits activated.'
       });
     }
 
-
-    // NEXUS PRIME Pricing Model:
-    // Starter: $9/mo (100 credits)
-    // PRO: $29/mo (500 credits)
-    // Enterprise: $99/mo (2000 credits)
-    
+    let mode: Stripe.Checkout.SessionCreateParams.Mode = 'subscription';
     let priceId = '';
     let credits = 0;
+    let metadata: any = { userId, type };
 
-    switch (tier) {
-      case 'Starter':
-        priceId = process.env.STRIPE_STARTER_PRICE_ID!;
-        credits = 100;
-        break;
-      case 'PRO':
-        priceId = process.env.STRIPE_PRO_PRICE_ID!;
-        credits = 500;
-        break;
-      case 'Enterprise':
-        priceId = process.env.STRIPE_ENTERPRISE_PRICE_ID!;
-        credits = 2000;
-        break;
-      default:
-        return NextResponse.json({ error: 'Invalid tier selection' }, { status: 400 });
+    if (type === 'subscription') {
+      mode = 'subscription';
+      metadata.tier = tier;
+      switch (tier) {
+        case 'Starter':
+          priceId = process.env.STRIPE_STARTER_PRICE_ID!;
+          credits = 100;
+          break;
+        case 'PRO':
+          priceId = process.env.STRIPE_PRO_PRICE_ID!;
+          credits = 500;
+          break;
+        case 'Enterprise':
+          priceId = process.env.STRIPE_ENTERPRISE_PRICE_ID!;
+          credits = 2000;
+          break;
+        default:
+          return NextResponse.json({ error: 'Invalid tier' }, { status: 400 });
+      }
+    } else if (type === 'topup') {
+      mode = 'payment';
+      metadata.packId = packId;
+      switch (packId) {
+        case 'pack_50':
+          priceId = process.env.STRIPE_TOPUP_50_PRICE_ID!;
+          credits = 50;
+          break;
+        case 'pack_250':
+          priceId = process.env.STRIPE_TOPUP_250_PRICE_ID!;
+          credits = 250;
+          break;
+        case 'pack_1000':
+          priceId = process.env.STRIPE_TOPUP_1000_PRICE_ID!;
+          credits = 1000;
+          break;
+        default:
+          return NextResponse.json({ error: 'Invalid pack' }, { status: 400 });
+      }
+    } else {
+      return NextResponse.json({ error: 'Invalid checkout type' }, { status: 400 });
     }
+
+    metadata.credits = credits.toString();
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
-      mode: 'subscription',
+      mode,
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/pricing`,
-      metadata: {
-        userId,
-        credits: credits.toString(),
-        tier,
-      },
+      metadata,
+      customer_email: user.email,
     });
+
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {

@@ -70,6 +70,27 @@ export async function POST(
     return NextResponse.json({ error: "Project not found or unauthorized" }, { status: 404 });
   }
 
+  // 2. CHECK PROTOCOL FEE (One-time $10 / 10 Credits)
+  const { data: existingDomain } = await supabase
+    .from("custom_domains")
+    .select("protocol_fee_paid")
+    .eq("project_id", projectId)
+    .single();
+
+  if (!existingDomain?.protocol_fee_paid) {
+     const { data: result, error: rpcError } = await supabase.rpc('deduct_user_credits', {
+        target_user_id: user.id,
+        amount_to_deduct: 10
+      });
+
+      if (rpcError || !result.success) {
+        return NextResponse.json(
+          { error: 'Protocol Fee Required: 10 Credits to link a custom domain.' },
+          { status: 402 }
+        );
+      }
+  }
+
   // Initial DNS records for verification
   const dnsRecords = [
     { type: "CNAME", name: "@", value: "cname.nexusprime.app", verified: false },
@@ -82,6 +103,7 @@ export async function POST(
       project_id: projectId,
       domain,
       dns_records: dnsRecords,
+      protocol_fee_paid: true // Marked as paid after successful deduction
     })
     .select()
     .single();

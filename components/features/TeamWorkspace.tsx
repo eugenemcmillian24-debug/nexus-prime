@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { TIER_LIMITS } from "@/lib/nexus_prime_access";
 
 interface Team {
   id: string;
@@ -87,9 +88,22 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"editor" | "viewer" | "admin">("editor");
   const [isLoading, setIsLoading] = useState(false);
+  const [ownerTier, setOwnerTier] = useState<string>("Free");
+  const [seatLimit, setSeatLimit] = useState<number>(1);
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     fetchTeams();
+    const handleResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (mobile) setSidebarOpen(false);
+      else setSidebarOpen(true);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   useEffect(() => {
@@ -97,8 +111,22 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
       fetchMembers(activeTeam.id);
       fetchActivity(activeTeam.id);
       fetchInvites(activeTeam.id);
+      fetchOwnerTier(activeTeam.ownerId);
     }
   }, [activeTeam]);
+
+  const fetchOwnerTier = async (ownerId: string) => {
+    try {
+      const res = await fetch(`/api/user/tier?userId=${ownerId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setOwnerTier(data.tier);
+        setSeatLimit(data.seatLimit);
+      }
+    } catch (error) {
+      console.error("Failed to fetch owner tier:", error);
+    }
+  };
 
   const fetchTeams = async () => {
     try {
@@ -209,9 +237,19 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
   const canManage = currentUserRole === "owner" || currentUserRole === "admin";
 
   return (
-    <div style={{ display: "flex", height: "100%", background: "#0a0a0a", color: "#e5e5e5" }}>
+    <div style={{ display: "flex", height: "100%", background: "#0a0a0a", color: "#e5e5e5", position: "relative" }}>
       {/* Sidebar - Team List */}
-      <div style={{ width: "240px", borderRight: "1px solid #262626", display: "flex", flexDirection: "column" }}>
+      <div style={{ 
+        width: sidebarOpen ? "240px" : "0px", 
+        borderRight: sidebarOpen ? "1px solid #262626" : "none", 
+        display: "flex", flexDirection: "column",
+        transition: "all 0.3s ease",
+        overflow: "hidden",
+        position: isMobile && sidebarOpen ? "absolute" : "relative",
+        zIndex: 100,
+        height: "100%",
+        background: "#0a0a0a",
+      }}>
         <div style={{ padding: "16px", borderBottom: "1px solid #262626", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h2 style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>👥 Teams</h2>
           <button
@@ -273,7 +311,7 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
           </div>
         ) : showCreateTeam ? (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ width: "400px", padding: "32px", borderRadius: "16px", background: "#171717", border: "1px solid #262626" }}>
+            <div style={{ width: window.innerWidth < 640 ? "90%" : "400px", padding: "32px", borderRadius: "16px", background: "#171717", border: "1px solid #262626" }}>
               <h3 style={{ margin: "0 0 24px", fontSize: "18px", fontWeight: 600 }}>Create Team</h3>
               <input
                 type="text"
@@ -317,15 +355,32 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
         ) : (
           <>
             {/* Team header */}
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #262626", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #262626", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                {isMobile && (
+                  <button 
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                    style={{ background: "transparent", border: "none", color: "#fff", fontSize: "20px", cursor: "pointer" }}
+                  >
+                    ☰
+                  </button>
+                )}
                 <span style={{ fontSize: "24px" }}>🏢</span>
                 <div>
                   <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>{activeTeam?.name}</h2>
-                  <span style={{ fontSize: "12px", color: "#737373" }}>
-                    {members.length} member{members.length !== 1 ? "s" : ""}
-                    {currentUserRole && ` · ${ROLE_CONFIG[currentUserRole].icon} ${ROLE_CONFIG[currentUserRole].label}`}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "12px", color: "#737373" }}>
+                      {members.length + invites.filter(i => !i.acceptedAt).length} / {seatLimit} Seats Used
+                    </span>
+                    <div style={{ width: "60px", height: "4px", background: "#171717", borderRadius: "2px", overflow: "hidden" }}>
+                      <div style={{
+                        width: `${Math.min(100, ((members.length + invites.filter(i => !i.acceptedAt).length) / seatLimit) * 100)}%`,
+                        height: "100%",
+                        background: "#00ff88"
+                      }} />
+                    </div>
+                    {currentUserRole && <span style={{ fontSize: "12px", color: "#525252" }}> · {ROLE_CONFIG[currentUserRole].icon} {ROLE_CONFIG[currentUserRole].label}</span>}
+                  </div>
                 </div>
               </div>
               {canManage && (
@@ -337,10 +392,11 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
                     color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 600,
                   }}
                 >
-                  + Invite Member
+                  + Invite
                 </button>
               )}
             </div>
+
 
             {/* Tabs */}
             <div style={{ padding: "0 20px", borderBottom: "1px solid #262626", display: "flex", gap: "24px" }}>
@@ -555,7 +611,7 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
             display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50,
           }}>
             <div style={{
-              width: "420px", padding: "24px", borderRadius: "16px",
+              width: window.innerWidth < 640 ? "90%" : "420px", padding: "24px", borderRadius: "16px",
               background: "#171717", border: "1px solid #262626",
             }}>
               <h3 style={{ margin: "0 0 20px", fontSize: "16px" }}>Invite Member</h3>

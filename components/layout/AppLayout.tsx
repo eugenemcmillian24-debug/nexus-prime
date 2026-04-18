@@ -35,6 +35,7 @@ const VoiceStreamOverlay = dynamic(() => import("@/components/features/VoiceStre
 const SecurityShield = dynamic(() => import("@/components/features/SecurityShield"), { ssr: false });
 const TestGenerator = dynamic(() => import("@/components/features/TestGenerator"), { ssr: false });
 const PerformanceMonitor = dynamic(() => import("@/components/features/PerformanceMonitor"), { ssr: false });
+const AdminControlPanel = dynamic(() => import("@/components/features/AdminControlPanel"), { ssr: false });
 const DeploymentCommandCenter = dynamic(() => import("@/components/features/DeploymentCommandCenter"), { ssr: false });
 const MobileEmulator = dynamic(() => import("@/components/features/MobileEmulator"), { ssr: false });
 const CommunityTemplates = dynamic(() => import("@/components/features/CommunityTemplates"), { ssr: false });
@@ -80,6 +81,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "keys", label: "API Keys", icon: "🔑", section: "platform" },
   { id: "notifications", label: "Notifications", icon: "🔔", section: "platform" },
   { id: "settings", label: "Settings", icon: "⚙️", section: "platform" },
+  { id: "admin", label: "System Admin", icon: "🛠️", section: "platform", badge: "ROOT" },
 ];
 
 const SECTION_LABELS: Record<string, string> = {
@@ -111,9 +113,21 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
   const [currentVersion, setCurrentVersion] = useState(initialVersion);
   const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     isNexusPrimeAdmin().then(setIsAdmin);
+
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setSidebarCollapsed(true);
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   // Global "V" hotkey for voice command
@@ -190,9 +204,19 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
             {/* Right split panel */}
             {rightPanel !== "none" && (
               <div style={{
-                width: "420px", borderLeft: "1px solid #262626",
+                width: isMobile ? "100%" : "420px", 
+                borderLeft: isMobile ? "none" : "1px solid #262626",
                 display: "flex", flexDirection: "column", overflow: "hidden",
+                position: isMobile ? "absolute" : "relative",
+                top: 0, right: 0, bottom: 0,
+                background: "#0a0a0a",
+                zIndex: 50,
               }}>
+                {isMobile && (
+                  <div style={{ padding: "10px", borderBottom: "1px solid #262626", display: "flex", justifyContent: "flex-end" }}>
+                    <button onClick={() => setRightPanel("none")} style={{ background: "transparent", border: "none", color: "#fff" }}>CLOSE</button>
+                  </div>
+                )}
                 {rightPanel === "review" && currentFile && (
                   <AICodeReview
                     projectId={projectId}
@@ -369,6 +393,8 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
         return <ProjectSettings projectId={projectId} />;
       case "keys":
         return <ApiKeyManager userId={userId} />;
+      case "admin":
+        return <AdminControlPanel />;
       default:
         return <EmptyState icon="🚀" title="Nexus Prime" message="Select a tool from the sidebar" />;
     }
@@ -400,11 +426,15 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
       {/* Sidebar */}
       <aside
         style={{
-          width: sidebarCollapsed ? "56px" : "200px",
+          width: sidebarCollapsed ? (isMobile ? "0px" : "56px") : "200px",
           borderRight: "1px solid #262626",
           display: "flex", flexDirection: "column",
-          transition: "width 0.2s ease",
+          transition: "all 0.2s ease",
           overflow: "hidden", flexShrink: 0,
+          position: isMobile && !sidebarCollapsed ? "absolute" : "relative",
+          zIndex: 100,
+          height: "100%",
+          background: "#0a0a0a",
         }}
       >
         {/* Logo */}
@@ -460,7 +490,10 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                   {SECTION_LABELS[section]}
                 </div>
               )}
-              {NAV_ITEMS.filter((item) => item.section === section).map((item) => (
+              {NAV_ITEMS.filter((item) => {
+                if (item.id === "admin") return isAdmin;
+                return item.section === section;
+              }).map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setActiveView(item.id)}
@@ -517,8 +550,16 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
           padding: "0 16px", flexShrink: 0,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "13px", color: "#737373" }}>{projectName}</span>
-            <span style={{ color: "#262626" }}>/</span>
+            {isMobile && (
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                style={{ background: "transparent", border: "none", color: "#fff", fontSize: "20px", cursor: "pointer", padding: "0 8px" }}
+              >
+                ☰
+              </button>
+            )}
+            <span style={{ fontSize: "13px", color: "#737373", display: isMobile ? "none" : "block" }}>{projectName}</span>
+            {!isMobile && <span style={{ color: "#262626" }}>/</span>}
             <span style={{ fontSize: "13px", color: "#d4d4d4", fontWeight: 500 }}>
               {NAV_ITEMS.find((n) => n.id === activeView)?.label || activeView}
             </span>
@@ -539,7 +580,8 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                     key={panel}
                     onClick={() => toggleRightPanel(panel)}
                     style={{
-                      padding: "4px 10px", borderRadius: "6px",
+                      padding: isMobile ? "4px 6px" : "4px 10px", 
+                      borderRadius: "6px",
                       border: "1px solid",
                       borderColor: rightPanel === panel ? "#6366f1" : "#262626",
                       background: rightPanel === panel ? "#1e1b4b" : "transparent",
@@ -550,7 +592,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                     title={`Toggle ${label} panel`}
                   >
                     <span>{icon}</span>
-                    {label}
+                    {!isMobile && label}
                   </button>
                 ))}
               </>
@@ -561,7 +603,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
         {/* Content area */}
         <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
           {/* Optional file tree sidebar (when in editor view) */}
-          {activeView === "editor" && (
+          {activeView === "editor" && !isMobile && (
             <div style={{ width: "240px", borderRight: "1px solid #262626", overflow: "auto" }}>
               <FileExplorer
                 projectId={projectId}
