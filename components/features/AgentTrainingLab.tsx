@@ -133,7 +133,7 @@ export default function AgentTrainingLab() {
       });
       if (res.ok) {
         setShowCreate(false);
-        setNewModule({ name: "", description: "", system_prompt: "", is_public: false });
+        setNewModule({ name: "", description: "", system_prompt: "", price: 0, is_public: false });
         fetchModules();
       }
     } catch (error) {
