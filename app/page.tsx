@@ -172,7 +172,7 @@ export default function Page() {
         setJobId(data.jobId);
       } else if (response.status === 402) {
         alert(data.error);
-        setShowPricing(true);
+        setActiveTab('pricing');
       } else {
         alert(data.error);
       }
