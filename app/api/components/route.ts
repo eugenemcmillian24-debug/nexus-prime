@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { z, ZodError } from "zod";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+let _supabase: SupabaseClient | null = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 const ComponentQuerySchema = z.object({
   userId: z.string().uuid(),
@@ -26,6 +32,7 @@ const CreateComponentSchema = z.object({
 // GET: Fetch saved components
 export async function GET(req: Request) {
   try {
+    const supabase = getSupabase();
     const url = new URL(req.url);
     const params = ComponentQuerySchema.parse({
       userId: url.searchParams.get("userId"),
@@ -60,6 +67,7 @@ export async function GET(req: Request) {
 // POST: Save a new component
 export async function POST(req: Request) {
   try {
+    const supabase = getSupabase();
     const body = await req.json();
     const params = CreateComponentSchema.parse(body);
 

@@ -1,32 +1,59 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16' as any,
-});
+let _stripe: Stripe | null = null;
+function getStripe() {
+  if (!_stripe) {
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: '2023-10-16' as any,
+    });
+  }
+  return _stripe;
+}
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+let _supabase: SupabaseClient | null = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+// Credit mapping by price ID (resolved lazily)
+let _priceToPlan: Record<string, { tier: string; credits: number }> | null = null;
+function getPriceToPlan() {
+  if (!_priceToPlan) {
+    _priceToPlan = {
+      [process.env.STRIPE_STARTER_PRICE_ID!]: { tier: 'Starter', credits: 100 },
+      [process.env.STRIPE_PRO_PRICE_ID!]: { tier: 'PRO', credits: 500 },
+      [process.env.STRIPE_ENTERPRISE_PRICE_ID!]: { tier: 'Enterprise', credits: 2000 },
+    };
+  }
+  return _priceToPlan;
+}
 
-// Credit mapping by price ID
-const PRICE_TO_PLAN: Record<string, { tier: string; credits: number }> = {
-  [process.env.STRIPE_STARTER_PRICE_ID!]: { tier: 'Starter', credits: 100 },
-  [process.env.STRIPE_PRO_PRICE_ID!]: { tier: 'PRO', credits: 500 },
-  [process.env.STRIPE_ENTERPRISE_PRICE_ID!]: { tier: 'Enterprise', credits: 2000 },
-};
-
-const TOPUP_PRICE_TO_CREDITS: Record<string, number> = {
-  [process.env.STRIPE_TOPUP_50_PRICE_ID!]: 50,
-  [process.env.STRIPE_TOPUP_250_PRICE_ID!]: 250,
-  [process.env.STRIPE_TOPUP_1000_PRICE_ID!]: 1000,
-};
+let _topupPriceToCredits: Record<string, number> | null = null;
+function getTopupPriceToCredits() {
+  if (!_topupPriceToCredits) {
+    _topupPriceToCredits = {
+      [process.env.STRIPE_TOPUP_50_PRICE_ID!]: 50,
+      [process.env.STRIPE_TOPUP_250_PRICE_ID!]: 250,
+      [process.env.STRIPE_TOPUP_1000_PRICE_ID!]: 1000,
+    };
+  }
+  return _topupPriceToCredits;
+}
 
 export async function POST(req: Request) {
+  const stripe = getStripe();
+  const supabase = getSupabase();
+  const PRICE_TO_PLAN = getPriceToPlan();
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+
   const body = await req.text();
   const sig = req.headers.get('stripe-signature');
 
@@ -112,7 +139,7 @@ export async function POST(req: Request) {
         break;
       }
 
-      // ── Subscription updated (renewal, plan change, etc.) ─
+      // -- Subscription updated (renewal, plan change, etc.) --
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription;
         const priceId = sub.items.data[0]?.price.id;
@@ -142,7 +169,7 @@ export async function POST(req: Request) {
         break;
       }
 
-      // ── Subscription deleted (canceled/expired) ───────────
+      // -- Subscription deleted (canceled/expired) --
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription;
 
@@ -160,7 +187,7 @@ export async function POST(req: Request) {
         break;
       }
 
-      // ── Invoice paid (recurring billing success) ──────────
+      // -- Invoice paid (recurring billing success) --
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
         if (invoice.billing_reason === 'subscription_cycle') {
@@ -202,7 +229,7 @@ export async function POST(req: Request) {
         break;
       }
 
-      // ── Payment failed ────────────────────────────────────
+      // -- Payment failed --
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice;
         const subId = invoice.subscription as string;
