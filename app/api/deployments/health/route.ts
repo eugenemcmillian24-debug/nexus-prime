@@ -21,14 +21,44 @@ export async function POST(req: Request) {
       supabaseKey,
     });
 
-    // Mock logs if not provided
-    const deploymentLogs = logs || `
-      [BUILD] Next.js build started...
-      [BUILD] Compiling...
-      [WARN] Large bundle size detected in app/page.tsx (500KB)
-      [ERROR] Runtime error in components/features/RealtimeCollab.tsx: "Cannot read property 'id' of null"
-      [BUILD] Build finished in 45s.
-    `;
+    // 1. ATTEMPT TO FETCH REAL VERCEL LOGS IF PROJECT_ID IS PROVIDED
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    let deploymentLogs = logs;
+    if (!deploymentLogs && projectId) {
+        try {
+            const { data: latestDeploy } = await supabase
+                .from('deployments')
+                .select('metadata, platform')
+                .eq('project_id', projectId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (latestDeploy?.platform === 'vercel' && (latestDeploy.metadata as any)?.deploymentId) {
+                const vercelToken = process.env.VERCEL_TOKEN;
+                const vRes = await fetch(`https://api.vercel.com/v2/deployments/${(latestDeploy.metadata as any).deploymentId}/events`, {
+                    headers: { "Authorization": `Bearer ${vercelToken}` }
+                });
+                if (vRes.ok) {
+                    const events = await vRes.json();
+                    deploymentLogs = events.map((e: any) => `[${e.type}] ${e.payload?.text || e.text}`).join('\n');
+                }
+            }
+        } catch (e) {
+            console.error("Failed to fetch real Vercel logs", e);
+        }
+    }
+
+    // Fallback to mock logs if still empty
+    if (!deploymentLogs) {
+        deploymentLogs = `
+          [BUILD] Next.js build started...
+          [BUILD] Compiling...
+          [WARN] Large bundle size detected in app/page.tsx (500KB)
+          [ERROR] Runtime error in components/features/RealtimeCollab.tsx: "Cannot read property 'id' of null"
+          [BUILD] Build finished in 45s.
+        `;
+    }
 
     const analysis = await orchestrator.analyzeDeploymentHealth(deploymentLogs);
 

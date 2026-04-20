@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
+import { decrypt } from "@/lib/crypto";
 
 const ExportSchema = z.object({
   userId: z.string().uuid(),
@@ -28,19 +29,27 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { repoName, files, isPrivate } = ExportSchema.parse({ ...body, userId: user.id });
 
-    // Verify user exists
+    // Verify user exists and get tokens
     const { data: profile } = await supabase
       .from("profiles")
-      .select("github_token")
+      .select("github_token, github_token_encrypted")
       .eq("id", userId)
       .single();
 
-    // Use user's GitHub token if stored, otherwise fall back to app-level
-    const ghToken = profile?.github_token || process.env.GITHUB_TOKEN;
+    // Prioritize encrypted token, then legacy plain token, then app-level ONLY IF explicitly allowed
+    let ghToken = decrypt(profile?.github_token_encrypted) || profile?.github_token;
+    
+    // SECURITY GATE: Prevent using admin token for user exports unless user is admin
+    if (!ghToken) {
+        const { data: credits } = await supabase.from('user_credits').select('tier').eq('user_id', userId).single();
+        if (credits?.tier === 'Admin') {
+            ghToken = process.env.GITHUB_TOKEN ?? null;
+        }
+    }
 
     if (!ghToken) {
       return NextResponse.json(
-        { error: "GitHub token not configured" },
+        { error: "GitHub account not linked. Please add your Personal Access Token in Settings." },
         { status: 400 }
       );
     }

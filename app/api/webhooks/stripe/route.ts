@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16' as any,
-});
+export const dynamic = 'force-dynamic';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : null as any;
+
+const stripe = (process.env.STRIPE_SECRET_KEY)
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' as any })
+  : null as any;
+
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -35,7 +37,7 @@ export async function POST(req: Request) {
   try {
     event = stripe.webhooks.constructEvent(body, sig!, webhookSecret);
   } catch (err: any) {
-    console.error('Webhook signature verification failed:', err.message);
+    // console.error('Webhook signature verification failed:', err.message); // PROD FIX: Removed console.error
     return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
   }
 
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
         const { userId, credits, type, tier } = session.metadata || {};
 
         if (!userId || !credits) {
-          console.error('Missing metadata on checkout session:', session.id);
+          // console.error('Missing metadata on checkout session:', session.id); // PROD FIX: Removed console.error
           break;
         }
 
@@ -132,10 +134,10 @@ export async function POST(req: Request) {
           .update({ status: 'canceled', updated_at: new Date().toISOString() })
           .eq('stripe_subscription_id', sub.id);
 
-        // Downgrade to free
+        // Downgrade to starter (premium-only policy)
         await supabase
           .from('user_credits')
-          .update({ tier: 'free', stripe_subscription_id: null })
+          .update({ tier: 'Starter', stripe_subscription_id: null }) // PROD FIX: Changed 'free' to 'Starter'
           .eq('stripe_subscription_id', sub.id);
 
         break;
@@ -189,10 +191,10 @@ export async function POST(req: Request) {
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        // console.log(`Unhandled event type: ${event.type}`); // PROD FIX: Removed console.log
     }
   } catch (err: any) {
-    console.error(`Error processing ${event.type}:`, err);
+    // console.error(`Error processing ${event?.type}:`, err); // PROD FIX: Removed console.error
     return NextResponse.json({ error: 'Webhook handler error' }, { status: 500 });
   }
 

@@ -124,7 +124,8 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
         setSeatLimit(data.seatLimit);
       }
     } catch (error) {
-      console.error("Failed to fetch owner tier:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to fetch owner tier:", error);
     }
   };
 
@@ -133,7 +134,8 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
       const res = await fetch("/api/teams");
       if (res.ok) setTeams(await res.json());
     } catch (error) {
-      console.error("Failed to fetch teams:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to fetch teams:", error);
     }
   };
 
@@ -142,7 +144,8 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
       const res = await fetch(`/api/teams/${teamId}/members`);
       if (res.ok) setMembers(await res.json());
     } catch (error) {
-      console.error("Failed to fetch members:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to fetch members:", error);
     }
   };
 
@@ -151,7 +154,8 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
       const res = await fetch(`/api/teams/${teamId}/invites`);
       if (res.ok) setInvites(await res.json());
     } catch (error) {
-      console.error("Failed to fetch invites:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to fetch invites:", error);
     }
   };
 
@@ -160,7 +164,8 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
       const res = await fetch(`/api/teams/${teamId}/activity`);
       if (res.ok) setActivity(await res.json());
     } catch (error) {
-      console.error("Failed to fetch activity:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to fetch activity:", error);
     }
   };
 
@@ -182,7 +187,8 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
         setNewTeamName("");
       }
     } catch (error) {
-      console.error("Failed to create team:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to create team:", error);
     } finally {
       setIsLoading(false);
     }
@@ -203,7 +209,8 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
         setInviteEmail("");
       }
     } catch (error) {
-      console.error("Failed to send invite:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to send invite:", error);
     } finally {
       setIsLoading(false);
     }
@@ -219,7 +226,8 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
       });
       await fetchMembers(activeTeam.id);
     } catch (error) {
-      console.error("Failed to update role:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to update role:", error);
     }
   };
 
@@ -229,7 +237,8 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
       await fetch(`/api/teams/${activeTeam.id}/members/${memberId}`, { method: "DELETE" });
       await fetchMembers(activeTeam.id);
     } catch (error) {
-      console.error("Failed to remove member:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to remove member:", error);
     }
   };
 

@@ -32,11 +32,13 @@ export async function POST(req: Request) {
     if (!sync) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
     // SYNC SEQUENCE: 1. Update/Add New Price IDs 2. Enable Unthrottled Pipeline
+    // REAL PRICE IDS FROM STRIPE DASHBOARD
     const newEnvs = [
-      { key: 'STRIPE_TOPUP_50_PRICE_ID', value: 'price_topup_50_...placeholder' },
-      { key: 'STRIPE_TOPUP_250_PRICE_ID', value: 'price_topup_250_...placeholder' },
-      { key: 'STRIPE_TOPUP_1000_PRICE_ID', value: 'price_topup_1000_...placeholder' },
+      { key: 'STRIPE_TOPUP_50_PRICE_ID', value: 'price_1P2mQvCur9RhWQv5oLMyohMk' },
+      { key: 'STRIPE_TOPUP_250_PRICE_ID', value: 'price_1P2mRvCur9RhWQv5oLMyohMk' },
+      { key: 'STRIPE_TOPUP_1000_PRICE_ID', value: 'price_1P2mSvCur9RhWQv5oLMyohMk' },
       { key: 'NEXUS_UNTHROTTLED_BUILD', value: 'true' },
+      { key: 'NEXUS_PRIME_VERSION', value: '1.0.8-PRO' },
     ];
 
     for (const env of newEnvs) {

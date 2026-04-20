@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { encrypt } from "@/lib/crypto";
 
 // GET /api/keys - List user's API keys
 export async function GET() {
@@ -45,8 +46,8 @@ export async function POST(req: NextRequest) {
     : "****";
 
   // In production: encrypt key with per-user key via KMS
-  // For now, basic XOR obfuscation placeholder
-  const encrypted = Buffer.from(key).toString("base64");
+  // Secured with AES-256-CBC encryption
+  const encrypted = encrypt(key);
 
   const { data, error } = await supabase
     .from("api_keys")

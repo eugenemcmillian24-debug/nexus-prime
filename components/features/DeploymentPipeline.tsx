@@ -61,7 +61,8 @@ export default function DeploymentPipeline({
         setDeployments(data);
       }
     } catch (error) {
-      console.error("Failed to fetch deployments:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Failed to fetch deployments:", error);
     }
   };
 
@@ -92,7 +93,8 @@ export default function DeploymentPipeline({
       // Poll for status updates
       pollDeployStatus(deployment.id);
     } catch (error) {
-      console.error("Deploy failed:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Deploy failed:", error);
     } finally {
       setIsDeploying(false);
     }
@@ -131,7 +133,8 @@ export default function DeploymentPipeline({
         prev.map((d) => (d.id === deployId ? { ...d, status: "cancelled" as const } : d))
       );
     } catch (error) {
-      console.error("Cancel failed:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Cancel failed:", error);
     }
   };
 
@@ -144,7 +147,8 @@ export default function DeploymentPipeline({
       });
       fetchDeployments();
     } catch (error) {
-      console.error("Rollback failed:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Rollback failed:", error);
     }
   };
 
@@ -165,7 +169,8 @@ export default function DeploymentPipeline({
         alert("Healing failed. Please try again or check logs.");
       }
     } catch (error) {
-      console.error("Heal failed:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Heal failed:", error);
     } finally {
       setHealingId(null);
     }
@@ -184,7 +189,8 @@ export default function DeploymentPipeline({
         triggerDeploy(selectedEnv);
       }
     } catch (error) {
-      console.error("Apply heal failed:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Apply heal failed:", error);
     }
   };
 

@@ -48,7 +48,8 @@ export default function AgentTrainingLab() {
         setModules(data.modules);
       }
     } catch (error) {
-      console.error("Failed to fetch modules:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to fetch modules:", error);
     } finally {
       setIsLoading(false);
     }
@@ -62,7 +63,8 @@ export default function AgentTrainingLab() {
         setMarketplaceModules(data.modules);
       }
     } catch (error) {
-      console.error("Failed to fetch marketplace:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to fetch marketplace:", error);
     }
   };
 
@@ -74,7 +76,8 @@ export default function AgentTrainingLab() {
         setFeaturedModules(data.modules);
       }
     } catch (error) {
-      console.error("Failed to fetch featured modules:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to fetch featured modules:", error);
     }
   };
 
@@ -86,7 +89,8 @@ export default function AgentTrainingLab() {
         setAnalytics(data);
       }
     } catch (error) {
-      console.error("Failed to fetch analytics:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to fetch analytics:", error);
     }
   };
 

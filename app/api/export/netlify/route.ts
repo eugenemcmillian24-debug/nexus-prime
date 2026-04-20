@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import crypto from "crypto";
-
-const NETLIFY_TOKEN = process.env.NETLIFY_PERSONAL_TOKEN;
+import { createClient } from "@/lib/supabase/api";
+import { decrypt } from "@/lib/crypto";
 
 const DeploySchema = z.object({
   siteName: z
@@ -20,10 +20,30 @@ const DeploySchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    if (!NETLIFY_TOKEN) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("netlify_token_encrypted")
+      .eq("id", user.id)
+      .single();
+
+    let netlifyToken = decrypt(profile?.netlify_token_encrypted);
+    
+    // SECURITY GATE: Prevent using admin token for user exports unless user is admin
+    if (!netlifyToken) {
+        const { data: credits } = await supabase.from('user_credits').select('tier').eq('user_id', user.id).single();
+        if (credits?.tier === 'Admin') {
+            netlifyToken = process.env.NETLIFY_PERSONAL_TOKEN ?? null;
+        }
+    }
+
+    if (!netlifyToken) {
       return NextResponse.json(
-        { error: "Netlify token not configured. Add NETLIFY_PERSONAL_TOKEN to env vars." },
-        { status: 500 }
+        { error: "Netlify account not linked. Please add your Personal Access Token in Settings." },
+        { status: 400 }
       );
     }
 
@@ -37,7 +57,7 @@ export async function POST(req: Request) {
     const createSiteRes = await fetch("https://api.netlify.com/api/v1/sites", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${NETLIFY_TOKEN}`,
+        Authorization: `Bearer ${netlifyToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -57,7 +77,7 @@ export async function POST(req: Request) {
         const listRes = await fetch(
           `https://api.netlify.com/api/v1/sites?name=${siteName}`,
           {
-            headers: { Authorization: `Bearer ${NETLIFY_TOKEN}` },
+            headers: { Authorization: `Bearer ${netlifyToken}` },
           }
         );
         const sites = await listRes.json();
@@ -95,7 +115,7 @@ export async function POST(req: Request) {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${NETLIFY_TOKEN}`,
+          Authorization: `Bearer ${netlifyToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -125,7 +145,7 @@ export async function POST(req: Request) {
           {
             method: "PUT",
             headers: {
-              Authorization: `Bearer ${NETLIFY_TOKEN}`,
+              Authorization: `Bearer ${netlifyToken}`,
               "Content-Type": "application/octet-stream",
             },
             body: content,

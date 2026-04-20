@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
-
-const CF_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
-const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
+import { createClient } from "@/lib/supabase/api";
+import { decrypt } from "@/lib/crypto";
 
 const DeploySchema = z.object({
   projectName: z
@@ -20,13 +19,32 @@ const DeploySchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    if (!CF_API_TOKEN || !CF_ACCOUNT_ID) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("cloudflare_token_encrypted, cloudflare_account_id")
+      .eq("id", user.id)
+      .single();
+
+    let cfToken = decrypt(profile?.cloudflare_token_encrypted);
+    let cfAccountId = profile?.cloudflare_account_id;
+    
+    // SECURITY GATE: Prevent using admin token for user exports unless user is admin
+    if (!cfToken || !cfAccountId) {
+        const { data: credits } = await supabase.from('user_credits').select('tier').eq('user_id', user.id).single();
+        if (credits?.tier === 'Admin') {
+            cfToken = cfToken || (process.env.CLOUDFLARE_API_TOKEN ?? null);
+            cfAccountId = cfAccountId || (process.env.CLOUDFLARE_ACCOUNT_ID ?? null);
+        }
+    }
+
+    if (!cfToken || !cfAccountId) {
       return NextResponse.json(
-        {
-          error:
-            "Cloudflare not configured. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to env vars.",
-        },
-        { status: 500 }
+        { error: "Cloudflare account not linked. Please add your API Token and Account ID in Settings." },
+        { status: 400 }
       );
     }
 
@@ -35,10 +53,10 @@ export async function POST(req: Request) {
 
     // 1. Ensure project exists (create if not)
     const projectRes = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${projectName}`,
+      `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects/${projectName}`,
       {
         headers: {
-          Authorization: `Bearer ${CF_API_TOKEN}`,
+          Authorization: `Bearer ${cfToken}`,
         },
       }
     );
@@ -46,11 +64,11 @@ export async function POST(req: Request) {
     if (!projectRes.ok) {
       // Create the project
       const createRes = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects`,
+        `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${CF_API_TOKEN}`,
+            Authorization: `Bearer ${cfToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -82,11 +100,11 @@ export async function POST(req: Request) {
 
     // Create deployment
     const deployRes = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${projectName}/deployments`,
+      `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects/${projectName}/deployments`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${CF_API_TOKEN}`,
+          Authorization: `Bearer ${cfToken}`,
         },
         body: formData,
       }

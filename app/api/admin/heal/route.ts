@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     });
 
     // 1. Run AI Healing Diagnosis & Fix Generation
-    console.log(`[Admin] Triggering Auto-Heal for deployment: ${deploymentId}`);
+    // console.log(`[Admin] Triggering Auto-Heal for deployment: ${deploymentId}`); // PROD FIX: Removed console.log
     const healResult = await orchestrator.healDeployment(deploymentId);
 
     if (!healResult || !healResult.files) {

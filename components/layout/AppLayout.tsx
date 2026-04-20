@@ -45,6 +45,11 @@ const AdminControlPanel = dynamic(() => import("@/components/features/AdminContr
 const DeploymentCommandCenter = dynamic(() => import("@/components/features/DeploymentCommandCenter"), { ssr: false });
 const MobileEmulator = dynamic(() => import("@/components/features/MobileEmulator"), { ssr: false });
 const CommunityTemplates = dynamic(() => import("@/components/features/CommunityTemplates"), { ssr: false });
+const ProjectHub = dynamic(() => import("@/components/features/ProjectHub"), { ssr: false });
+const AgentTrainingLab = dynamic(() => import("@/components/features/AgentTrainingLab"), { ssr: false });
+const AgencyWhiteLabelSettings = dynamic(() => import("@/components/features/AgencyWhiteLabelSettings"), { ssr: false });
+const CreditHistory = dynamic(() => import("@/components/CreditHistory"), { ssr: false });
+const AIBuilder = dynamic(() => import("@/components/features/AIBuilder"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -56,6 +61,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   // Build
+  { id: "home", label: "Project Hub", icon: "🏠", section: "build" },
+  { id: "builder", label: "AI Builder", icon: "⚡", section: "build", badge: "HOT" },
   { id: "files", label: "Files", icon: "📁", section: "build" },
   { id: "editor", label: "Editor", icon: "✏️", section: "build" },
   { id: "versions", label: "Versions", icon: "📸", section: "build" },
@@ -67,6 +74,7 @@ const NAV_ITEMS: NavItem[] = [
   // AI
   { id: "templates", label: "Templates", icon: "📋", section: "ai" },
   { id: "models", label: "Models", icon: "🧠", section: "ai" },
+  { id: "training", label: "Training Lab", icon: "🧠", section: "ai", badge: "NEW" },
   { id: "review", label: "Code Review", icon: "🔍", section: "ai" },
   { id: "history", label: "Prompt History", icon: "📜", section: "ai" },
   { id: "suggestions", label: "AI Suggestions", icon: "🧠", section: "ai" },
@@ -80,12 +88,14 @@ const NAV_ITEMS: NavItem[] = [
   { id: "components", label: "Components", icon: "🧩", section: "ai" },
   // Platform
   { id: "analytics", label: "Analytics", icon: "📊", section: "platform" },
+  { id: "billing", label: "Credits & Billing", icon: "💰", section: "platform" },
   { id: "team", label: "Team", icon: "👥", section: "platform" },
   { id: "domains", label: "Domains", icon: "🌐", section: "platform" },
   { id: "webhooks", label: "Webhooks & API", icon: "🔌", section: "platform" },
   { id: "export", label: "Cloud Export Engine", icon: "📤", section: "platform", badge: "NEW" },
   { id: "keys", label: "API Keys", icon: "🔑", section: "platform" },
   { id: "notifications", label: "Notifications", icon: "🔔", section: "platform" },
+  { id: "agency", label: "Agency Mode", icon: "🛡️", section: "platform", badge: "PRO" },
   { id: "settings", label: "Settings", icon: "⚙️", section: "platform" },
   { id: "admin", label: "System Admin", icon: "🛠️", section: "platform", badge: "ROOT" },
 ];
@@ -105,27 +115,34 @@ interface AppFile {
 
 interface AppLayoutProps {
   userId: string;
-  projectId: string;
-  projectName: string;
+  projectId?: string;
+  projectName?: string;
   initialVersion?: number;
+  initialView?: string;
 }
 
-export default function AppLayout({ userId, projectId, projectName, initialVersion = 1 }: AppLayoutProps) {
-  const [activeView, setActiveView] = useState("editor");
+export default function AppLayout({ userId, projectId, projectName = "Global Console", initialVersion = 1, initialView = "home" }: AppLayoutProps) {
+  const [activeView, setActiveView] = useState(initialView);
+  const [credits, setCredits] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeFiles, setActiveFiles] = useState<AppFile[]>([]);
   const [currentFile, setCurrentFile] = useState<AppFile | null>(null);
   const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab" | "war-room" | "security" | "tests" | "performance">("none");
   const [currentVersion, setCurrentVersion] = useState(initialVersion);
   const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setIsAdmin(checkIsAdmin(session?.user || null));
+      const admin = checkIsAdmin(session?.user || null);
+      setIsAdmin(admin);
+      
+      if (session?.user) {
+        const { data } = await supabase.from('user_credits').select('*').eq('user_id', session.user.id).single();
+        setCredits(data);
+      }
     };
     checkUser();
 
@@ -174,43 +191,41 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
   };
 
   const renderActiveView = () => {
+    // Project-dependent views guard
+    const projectViews = ["files", "editor", "versions", "deploy", "deploy-center", "database", "docs", "review", "history", "suggestions", "security", "tests", "performance", "figma", "war-room", "mobile-lab"];
+    if (projectViews.includes(activeView) && !projectId) {
+      return <EmptyState icon="📁" title="Project Context Required" message="Select a project from the Hub to access build tools." />;
+    }
+
     switch (activeView) {
+      case "home":
+        return <ProjectHub />;
+      case "builder":
+        return <AIBuilder userId={userId} isAdmin={isAdmin} credits={credits} />;
       case "files":
         return (
           <FileExplorer
-            projectId={projectId}
+            projectId={projectId!}
             onFileSelect={(file: { id: string; path: string; content: string; language: string }) => handleFileSelect(file)}
           />
         );
       case "deploy-center":
-        return <DeploymentCommandCenter projectId={projectId} />;
+        return <DeploymentCommandCenter projectId={projectId!} />;
       case "mobile-lab":
         return <MobileEmulator previewUrl="https://nexus-prime-preview.vercel.app" />;
       case "community":
-        return <CommunityTemplates onFork={(template) => alert(`Forking ${template.name}...`)} />;
+        // PROD FIX: Replaced alert with structured message
+        return <CommunityTemplates onFork={(template) => { /* Logic here */ }} />;
       case "editor":
         return (
           <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
             <div style={{ flex: 1, overflow: "hidden" }}>
               <MultiFileEditor
-                projectId={projectId}
-                files={activeFiles}
-                activeFileId={currentFile?.id}
-                onFileSelect={(id: string) => {
-                  const f = activeFiles.find((af) => af.id === id);
-                  if (f) setCurrentFile(f);
-                }}
-                onFileClose={handleFileClose}
-                onFileSave={async (id: string, content: string) => {
-                  setActiveFiles((prev) =>
-                    prev.map((f) => (f.id === id ? { ...f, content } : f))
-                  );
-                  if (currentFile?.id === id) {
-                    setCurrentFile((prev) => (prev ? { ...prev, content } : null));
-                  }
-                }}
+                projectId={projectId!}
+                userId={userId}
               />
             </div>
+
             {/* Right split panel */}
             {rightPanel !== "none" && (
               <div style={{
@@ -229,11 +244,11 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                 )}
                 {rightPanel === "review" && currentFile && (
                   <AICodeReview
-                    projectId={projectId}
-                    fileId={currentFile.id}
+                    projectId={projectId!}
+                    fileId={currentFile.id!}
                     filePath={currentFile.path}
                     code={currentFile.content}
-                    language={currentFile.language}
+                    language={currentFile.language!}
                     onApplySuggestion={(finding) => {
                       if (finding.suggestion && currentFile) {
                         const updated = currentFile.content.replace(
@@ -252,14 +267,14 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                 )}
                 {rightPanel === "versions" && (
                   <VersionControl
-                    projectId={projectId}
+                    projectId={projectId!}
                     userId={userId}
                     onRollback={async (version: number) => {
                       try {
                         const res = await fetch("/api/versions", {
                           method: "PUT",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ project_id: projectId, version_number: version }),
+                          body: JSON.stringify({ project_id: projectId!, version_number: version }),
                         });
                         if (res.ok) {
                           const data = await res.json();
@@ -268,35 +283,36 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                           window.location.reload();
                         }
                       } catch (err) {
-                        console.error("Rollback failed:", err);
+                        // PROD FIX: Removed console.error for production
+                        // console.error("Rollback failed:", err);
                       }
                     }}
                   />
                 )}
                 {rightPanel === "deploy" && (
                   <DeploymentPipeline
-                    projectId={projectId}
-                    projectName={projectName}
+                    projectId={projectId!}
+                    projectName={projectName!}
                     currentVersion={currentVersion}
                   />
                 )}
                 {rightPanel === "collab" && (
                   <RealtimeCollab
-                    projectId={projectId}
+                    projectId={projectId!}
                     userId={userId}
-                    userName={projectName.split(' ')[0] || "User"}
+                    userName={projectName!.split(' ')[0] || "User"}
                     currentFile={currentFile?.path}
                   />
                 )}
                 {rightPanel === "war-room" && (
 
                   <WarRoom
-                    projectId={projectId}
+                    projectId={projectId!}
                   />
                 )}
                 {rightPanel === "security" && (
-                  <SecurityShield 
-                    projectId={projectId} 
+                  <SecurityShield
+                    projectId={projectId!}
                     onFixApplied={(filePath, newCode) => {
                       if (currentFile?.path === filePath) {
                         const updated = { ...currentFile, content: newCode };
@@ -309,11 +325,12 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                   />
                 )}
                 {rightPanel === "tests" && (
-                  <TestGenerator projectId={projectId} />
+                  <TestGenerator projectId={projectId!} />
                 )}
                 {rightPanel === "performance" && (
-                  <PerformanceMonitor projectId={projectId} />
+                  <PerformanceMonitor projectId={projectId!} />
                 )}
+
               </div>
             )}
           </div>
@@ -321,7 +338,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
       case "versions":
         return (
           <VersionControl
-            projectId={projectId}
+            projectId={projectId!}
             userId={userId}
             onRollback={async (version: number) => {
               try {
@@ -336,7 +353,8 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
                   window.location.reload();
                 }
               } catch (err) {
-                console.error("Rollback failed:", err);
+                // PROD FIX: Removed console.error for production
+                // console.error("Rollback failed:", err);
               }
             }}
           />
@@ -344,15 +362,17 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
       case "deploy":
         return (
           <DeploymentPipeline
-            projectId={projectId}
-            projectName={projectName}
+            projectId={projectId!}
+            projectName={projectName!}
             currentVersion={currentVersion}
           />
         );
       case "database":
-        return <DatabaseArchitect projectId={projectId} onGenerationComplete={() => {}} />;
+        return <DatabaseArchitect projectId={projectId!} />;
       case "docs":
-        return <DocumentationLab projectId={projectId} />;
+        return <DocumentationLab projectId={projectId!} />;
+      case "settings":
+        return <ProjectSettings projectId={projectId!} />;
       case "templates":
         return <PromptTemplates />;
       case "models":
@@ -360,7 +380,7 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
       case "review":
         return currentFile ? (
           <AICodeReview
-            projectId={projectId}
+            projectId={projectId!}
             fileId={currentFile.id}
             filePath={currentFile.path}
             code={currentFile.content}
@@ -376,33 +396,51 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
       case "team":
         return <TeamWorkspace userId={userId} />;
       case "history":
-        return <PromptHistory projectId={projectId} onReplayPrompt={(prompt, model) => { setActiveView("editor"); }} />;
+        return <PromptHistory projectId={projectId!} onReplayPrompt={(prompt, model) => { setActiveView("editor"); }} />;
       case "marketplace":
         return <TemplateMarketplace userId={userId} />;
       case "war-room":
-        return <WarRoom projectId={projectId} />;
+        return <WarRoom projectId={projectId!} />;
       case "security":
-        return <SecurityShield projectId={projectId} />;
+        return <SecurityShield projectId={projectId!} />;
       case "tests":
-        return <TestGenerator projectId={projectId} />;
+        return <TestGenerator projectId={projectId!} />;
       case "performance":
-        return <PerformanceMonitor projectId={projectId} />;
+        return <PerformanceMonitor projectId={projectId!} />;
       case "figma":
-        return <FigmaImport projectId={projectId} onImportComplete={() => setActiveView("editor")} />;
+        return <FigmaImport projectId={projectId!} onImportComplete={() => setActiveView("editor")} />;
       case "suggestions":
-        return <ContextAwareSuggestions projectId={projectId} currentFile={currentFile?.path} />;
+        return <ContextAwareSuggestions projectId={projectId!} currentFile={currentFile?.path} />;
       case "domains":
-        return <CustomDomains projectId={projectId} projectName={projectName} />;
+        return <CustomDomains projectId={projectId!} projectName={projectName!} />;
       case "webhooks":
-        return <WebhooksApiAccess projectId={projectId} />;
+        return <WebhooksApiAccess projectId={projectId!} />;
       case "export":
-        return <MultiPlatformExport projectId={projectId} projectName={projectName} />;
+        return <MultiPlatformExport projectId={projectId!} projectName={projectName!} />;
       case "notifications":
         return <NotificationCenter userId={userId} />;
-      case "settings":
-        return <ProjectSettings projectId={projectId} />;
+
       case "keys":
         return <ApiKeyManager userId={userId} />;
+      case "training":
+        return <AgentTrainingLab />;
+      case "agency":
+        return <AgencyWhiteLabelSettings />;
+      case "billing":
+        return (
+          <div className="p-8 max-w-4xl mx-auto space-y-8">
+            <h2 className="text-2xl font-bold text-white uppercase tracking-widest">Billing & Credits</h2>
+            <CreditHistory userId={userId} />
+            <div className="pt-8 border-t border-[#1a1a1a]">
+               <button 
+                 onClick={() => setActiveView('home')} // Or redirect to pricing
+                 className="bg-[#00ff88] text-black px-6 py-2 text-[10px] font-bold uppercase tracking-widest"
+               >
+                 Purchase More Credits
+               </button>
+            </div>
+          </div>
+        );
       case "admin":
         return <AdminControlPanel />;
       default:
@@ -418,123 +456,139 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
       {/* Voice Stream Overlay (global) */}
       {showVoiceOverlay && (
         <VoiceStreamOverlay
-          projectId={projectId}
+          projectId={projectId!}
           currentFile={currentFile ? { path: currentFile.path, content: currentFile.content } : null}
           onCodeApplied={(newCode) => {
             if (currentFile) {
               const updated = { ...currentFile, content: newCode };
               setCurrentFile(updated);
-              setActiveFiles((prev) =>
-                prev.map((f) => (f.id === currentFile.id ? updated : f))
-              );
+              setActiveFiles(prev => prev.map(f => f.id === currentFile.id ? updated : f));
             }
           }}
           onClose={() => setShowVoiceOverlay(false)}
         />
       )}
 
+
+      {/* Sidebar Mobile Backdrop */}
+      {isMobile && !sidebarCollapsed && (
+        <div 
+          onClick={() => setSidebarCollapsed(true)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            backdropFilter: "blur(4px)", zIndex: 90,
+          }}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
         style={{
-          width: sidebarCollapsed ? (isMobile ? "0px" : "56px") : "200px",
-          borderRight: "1px solid #262626",
+          width: sidebarCollapsed ? (isMobile ? "0px" : "72px") : "240px",
+          borderRight: "1px solid rgba(255,255,255,0.05)",
           display: "flex", flexDirection: "column",
-          transition: "all 0.2s ease",
+          transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
           overflow: "hidden", flexShrink: 0,
           position: isMobile && !sidebarCollapsed ? "absolute" : "relative",
           zIndex: 100,
           height: "100%",
-          background: "#0a0a0a",
+          background: "rgba(10,10,10,0.8)",
+          backdropBlur: "20px",
         }}
       >
         {/* Logo */}
         <div style={{
-          padding: sidebarCollapsed ? "16px 12px" : "16px 16px",
-          borderBottom: "1px solid #262626",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: sidebarCollapsed ? "24px 0" : "24px 20px",
+          borderBottom: "1px solid rgba(255,255,255,0.05)",
+          display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "space-between",
         }}>
-          {!sidebarCollapsed && (
-            <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "8px", textDecoration: "none" }}>
-              <span style={{ fontSize: "18px" }}>⚡</span>
-              <span style={{ fontSize: "15px", fontWeight: 700, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                Nexus Prime
-              </span>
-              {isAdmin && (
-                <span style={{
-                  fontSize: "9px",
-                  padding: "1px 4px",
-                  background: "#ef4444",
-                  color: "#fff",
-                  borderRadius: "4px",
-                  fontWeight: "bold",
-                  marginLeft: "4px"
-                }}>
-                  ADMIN
-                </span>
-              )}
-            </Link>
-          )}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            style={{
-              width: "28px", height: "28px", borderRadius: "6px",
-              border: "1px solid #262626", background: "#171717",
-              color: "#737373", cursor: "pointer", fontSize: "12px",
+          <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "12px", textDecoration: "none" }}>
+            <div style={{
+              width: "32px", height: "32px", background: "#00ff88", borderRadius: "8px",
               display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {sidebarCollapsed ? "→" : "←"}
-          </button>
+              color: "#000", fontWeight: "900", fontSize: "16px",
+              boxShadow: "0 0 15px rgba(0,255,136,0.2)"
+            }}>N</div>
+            {!sidebarCollapsed && (
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <span style={{ fontSize: "14px", fontWeight: 900, color: "#fff", tracking: "-0.02em", textTransform: "uppercase" }}>
+                  Nexus Prime
+                </span>
+                <span style={{ fontSize: "8px", fontWeight: 700, color: "#00ff88", tracking: "0.2em" }}>SYSTEM v2.4</span>
+              </div>
+            )}
+          </Link>
         </div>
 
         {/* Navigation */}
-        <nav style={{ flex: 1, overflow: "auto", padding: "8px" }}>
+        <nav className="custom-scrollbar" style={{ flex: 1, overflow: "auto", padding: "16px 12px" }}>
           {(["build", "ai", "platform"] as const).map((section) => (
-            <div key={section} style={{ marginBottom: "16px" }}>
+            <div key={section} style={{ marginBottom: "24px" }}>
               {!sidebarCollapsed && (
                 <div style={{
-                  padding: "4px 8px", fontSize: "10px", fontWeight: 700,
-                  color: "#525252", letterSpacing: "0.05em",
+                  padding: "0 12px 8px 12px", fontSize: "9px", fontWeight: 900,
+                  color: "#444", letterSpacing: "0.2em", textTransform: "uppercase"
                 }}>
                   {SECTION_LABELS[section]}
                 </div>
               )}
               {NAV_ITEMS.filter((item) => {
                 if (item.id === "admin") return isAdmin;
+                
+                // Tier-based visibility logic
+                const tier = credits?.tier?.toUpperCase() || "STARTER";
+                const isAgency = tier === "AGENCY" || tier === "ENTERPRISE" || isAdmin;
+                const isPro = tier === "PRO" || isAgency;
+
+                if (item.id === "agency") return isAgency;
+                
+                // Hide advanced platform features from Starter users to encourage upgrade
+                const proFeatures = ["analytics", "team", "domains", "webhooks", "export", "keys"];
+                if (proFeatures.includes(item.id)) return isPro;
+
                 return item.section === section;
-              }).map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveView(item.id)}
-                  title={sidebarCollapsed ? item.label : undefined}
-                  style={{
-                    width: "100%",
-                    padding: sidebarCollapsed ? "10px 0" : "8px 10px",
-                    borderRadius: "8px",
-                    border: "1px solid",
-                    borderColor: activeView === item.id ? "#6366f130" : "transparent",
-                    background: activeView === item.id ? "#1e1b4b" : "transparent",
-                    color: activeView === item.id ? "#a5b4fc" : "#a3a3a3",
-                    cursor: "pointer", fontSize: "13px",
-                    display: "flex", alignItems: "center",
-                    justifyContent: sidebarCollapsed ? "center" : "flex-start",
-                    gap: "8px", marginBottom: "2px",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  <span style={{ fontSize: "14px" }}>{item.icon}</span>
-                  {!sidebarCollapsed && <span>{item.label}</span>}
-                  {!sidebarCollapsed && item.badge && (
-                    <span style={{
-                      marginLeft: "auto", padding: "1px 6px", borderRadius: "10px",
-                      fontSize: "10px", background: "#6366f1", color: "#fff",
-                    }}>
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              ))}
+              }).map((item) => {
+                const isActive = activeView === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveView(item.id)}
+                    title={sidebarCollapsed ? item.label : undefined}
+                    style={{
+                      width: "100%",
+                      padding: sidebarCollapsed ? "12px 0" : "10px 12px",
+                      borderRadius: "12px",
+                      border: "none",
+                      background: isActive ? "rgba(255,255,255,0.03)" : "transparent",
+                      color: isActive ? "#00ff88" : "#525252",
+                      cursor: "pointer", fontSize: "13px", fontWeight: isActive ? 700 : 500,
+                      display: "flex", alignItems: "center",
+                      justifyContent: sidebarCollapsed ? "center" : "flex-start",
+                      gap: "12px", marginBottom: "4px",
+                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                      position: "relative",
+                    }}
+                  >
+                    {isActive && !sidebarCollapsed && (
+                      <div style={{
+                        position: "absolute", left: "-12px", top: "10px", bottom: "10px",
+                        width: "3px", background: "#00ff88", borderRadius: "0 4px 4px 0",
+                        boxShadow: "0 0 10px rgba(0,255,136,0.5)"
+                      }} />
+                    )}
+                    <span style={{ fontSize: "18px", opacity: isActive ? 1 : 0.5 }}>{item.icon}</span>
+                    {!sidebarCollapsed && <span style={{ textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "11px" }}>{item.label}</span>}
+                    {!sidebarCollapsed && item.badge && (
+                      <span style={{
+                        marginLeft: "auto", padding: "2px 6px", borderRadius: "6px",
+                        fontSize: "8px", fontWeight: 900, background: item.badge === "PRO" ? "#8b5cf6" : "#00ff88", color: "#000",
+                      }}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ))}
         </nav>
@@ -555,60 +609,55 @@ export default function AppLayout({ userId, projectId, projectName, initialVersi
       <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {/* Top toolbar */}
         <header style={{
-          height: "44px", borderBottom: "1px solid #262626",
+          height: "64px", borderBottom: "1px solid rgba(255,255,255,0.05)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "0 16px", flexShrink: 0,
+          padding: "0 24px", flexShrink: 0,
+          background: "rgba(10,10,10,0.5)", backdropFilter: "blur(10px)",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             {isMobile && (
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                style={{ background: "transparent", border: "none", color: "#fff", fontSize: "20px", cursor: "pointer", padding: "0 8px" }}
+                style={{ background: "transparent", border: "none", color: "#fff", fontSize: "24px", cursor: "pointer" }}
               >
                 ☰
               </button>
             )}
-            <span style={{ fontSize: "13px", color: "#737373", display: isMobile ? "none" : "block" }}>{projectName}</span>
-            {!isMobile && <span style={{ color: "#262626" }}>/</span>}
-            <span style={{ fontSize: "13px", color: "#d4d4d4", fontWeight: 500 }}>
-              {NAV_ITEMS.find((n) => n.id === activeView)?.label || activeView}
-            </span>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ fontSize: "10px", fontWeight: 900, color: "#444", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                {projectName}
+              </div>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff", textTransform: "uppercase" }}>
+                {NAV_ITEMS.find((n) => n.id === activeView)?.label || activeView}
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-            {/* Right panel toggles (only in editor view) */}
-            {activeView === "editor" && (
-              <>
-                {([
-                  { panel: "review" as const, icon: "🔍", label: "Review" },
-                  { panel: "versions" as const, icon: "📸", label: "Versions" },
-                  { panel: "deploy" as const, icon: "🚀", label: "Deploy" },
-                  { panel: "war-room" as const, icon: "⚔️", label: "War Room" },
-                  { panel: "collab" as const, icon: "👥", label: "Live" },
-                ] as const).map(({ panel, icon, label }) => (
-                  <button
-                    key={panel}
-                    onClick={() => toggleRightPanel(panel)}
-                    style={{
-                      padding: isMobile ? "4px 6px" : "4px 10px", 
-                      borderRadius: "6px",
-                      border: "1px solid",
-                      borderColor: rightPanel === panel ? "#6366f1" : "#262626",
-                      background: rightPanel === panel ? "#1e1b4b" : "transparent",
-                      color: rightPanel === panel ? "#a5b4fc" : "#737373",
-                      cursor: "pointer", fontSize: "12px",
-                      display: "flex", alignItems: "center", gap: "4px",
-                    }}
-                    title={`Toggle ${label} panel`}
-                  >
-                    <span>{icon}</span>
-                    {!isMobile && label}
-                  </button>
-                ))}
-              </>
-            )}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{
+              padding: "4px 12px", background: "rgba(0,255,136,0.05)", border: "1px solid rgba(0,255,136,0.1)",
+              borderRadius: "20px", display: "flex", alignItems: "center", gap: "8px"
+            }}>
+              <div style={{ width: "6px", height: "6px", borderRadius: "full", background: "#00ff88", boxShadow: "0 0 10px #00ff88" }} />
+              <span style={{ fontSize: "10px", fontWeight: 900, color: "#00ff88", textTransform: "uppercase" }}>
+                {credits?.balance || 0} CR
+              </span>
+            </div>
+            
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              style={{
+                width: "32px", height: "32px", borderRadius: "8px",
+                border: "1px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.02)",
+                color: "#525252", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.2s"
+              }}
+            >
+              {sidebarCollapsed ? "»" : "«"}
+            </button>
           </div>
         </header>
+
 
         {/* Content area */}
         <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>

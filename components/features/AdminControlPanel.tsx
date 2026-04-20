@@ -42,7 +42,8 @@ export default function AdminControlPanel() {
         setModerationModules(data.modules);
       }
     } catch (error) {
-      console.error("Failed to fetch moderation modules:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Failed to fetch moderation modules:", error);
     }
   };
 
@@ -57,7 +58,8 @@ export default function AdminControlPanel() {
         fetchModerationModules();
       }
     } catch (error) {
-      console.error("Failed to toggle featured status:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Failed to toggle featured status:", error);
     }
   };
 
@@ -69,7 +71,8 @@ export default function AdminControlPanel() {
         setDomainStats(data);
       }
     } catch (error) {
-      console.error("Failed to fetch domain stats:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Failed to fetch domain stats:", error);
     }
   };
 
@@ -86,7 +89,8 @@ export default function AdminControlPanel() {
         setDeploymentState(hasError ? "ERROR" : "READY");
       }
     } catch (error) {
-      console.error("Failed to fetch logs:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Failed to fetch logs:", error);
     }
   };
 
@@ -121,7 +125,8 @@ export default function AdminControlPanel() {
         setSeatOverrides(data.overrides || []);
       }
     } catch (error) {
-      console.error("Failed to fetch overrides:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Failed to fetch overrides:", error);
     }
   };
 
@@ -150,7 +155,8 @@ export default function AdminControlPanel() {
         setEnvs(data.envs);
       }
     } catch (error) {
-      console.error("Failed to fetch envs:", error);
+      // PROD FIX: Removed console.error
+      // console.error("Failed to fetch envs:", error);
     } finally {
       setIsLoading(false);
     }

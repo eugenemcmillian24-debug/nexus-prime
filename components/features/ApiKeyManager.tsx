@@ -48,7 +48,8 @@ export default function ApiKeyManager({ userId }: ApiKeyManagerProps) {
       const res = await fetch("/api/keys");
       if (res.ok) setKeys(await res.json());
     } catch (err) {
-      console.error("Failed to fetch keys:", err);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to fetch keys:", err);
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +72,8 @@ export default function ApiKeyManager({ userId }: ApiKeyManagerProps) {
         resetForm();
       }
     } catch (err) {
-      console.error("Failed to add key:", err);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to add key:", err);
     }
   };
 
@@ -80,7 +82,8 @@ export default function ApiKeyManager({ userId }: ApiKeyManagerProps) {
       await fetch(`/api/keys/${id}`, { method: "DELETE" });
       setKeys((prev) => prev.filter((k) => k.id !== id));
     } catch (err) {
-      console.error("Failed to delete key:", err);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to delete key:", err);
     }
   };
 
@@ -95,7 +98,8 @@ export default function ApiKeyManager({ userId }: ApiKeyManagerProps) {
         prev.map((k) => (k.id === id ? { ...k, isActive: !isActive } : k))
       );
     } catch (err) {
-      console.error("Failed to toggle key:", err);
+      // PROD FIX: Removed console.error for production
+      // console.error("Failed to toggle key:", err);
     }
   };
 

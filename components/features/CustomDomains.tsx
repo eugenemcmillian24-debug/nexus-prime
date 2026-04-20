@@ -52,7 +52,8 @@ export default function CustomDomains({ projectId, projectName }: CustomDomainsP
       const res = await fetch(`/api/projects/${projectId}/domains`);
       if (res.ok) setDomains(await res.json());
     } catch (err) {
-      console.error("Failed to fetch domains:", err);
+      // PROD FIX: Removed console.error
+      // console.error("Failed to fetch domains:", err);
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +100,8 @@ export default function CustomDomains({ projectId, projectName }: CustomDomainsP
         setDomains((prev) => prev.map((d) => (d.id === id ? updated : d)));
       }
     } catch (err) {
-      console.error("Verify failed:", err);
+      // PROD FIX: Removed console.error
+      // console.error("Verify failed:", err);
     } finally {
       setVerifyingId(null);
     }
@@ -111,7 +113,8 @@ export default function CustomDomains({ projectId, projectName }: CustomDomainsP
       await fetch(`/api/projects/${projectId}/domains/${id}`, { method: "DELETE" });
       setDomains((prev) => prev.filter((d) => d.id !== id));
     } catch (err) {
-      console.error("Remove failed:", err);
+      // PROD FIX: Removed console.error
+      // console.error("Remove failed:", err);
     }
   };
 

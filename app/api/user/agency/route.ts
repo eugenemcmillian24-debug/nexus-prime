@@ -26,6 +26,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // SECURITY: Verify user has Agency tier before allowing config updates
+  const { data: credits } = await supabase
+    .from('user_credits')
+    .select('agency_mode, tier')
+    .eq('user_id', user.id)
+    .single();
+
+  if (!credits?.agency_mode && credits?.tier !== 'Admin') {
+    return NextResponse.json({ error: 'Forbidden: Agency Mode is required to modify branding settings.' }, { status: 403 });
+  }
+
   const { agency_config } = await req.json();
 
   const { data, error } = await supabase

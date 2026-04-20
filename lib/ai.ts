@@ -192,8 +192,68 @@ RULES:
 `.trim();
 
 const SHIELD_MODE_SYSTEM_PROMPT = `
-...
+You are the NEXUS PRIME Security Shield Agent. Your goal is to identify security vulnerabilities in the provided code.
+STACK: Next.js 14, TypeScript, Supabase, Tailwind.
+
+TASK:
+1. AUDIT the provided files for OWASP Top 10 vulnerabilities (XSS, SQLi, CSRF, etc.).
+2. IDENTIFY insecure API routes, missing authentication checks, or exposed secrets.
+3. PROVIDE a structured report.
+
+OUTPUT FORMAT:
+Return ONLY a JSON array of vulnerability objects:
+[
+  {
+    "id": "uuid",
+    "severity": "critical" | "high" | "medium" | "low",
+    "title": "Short descriptive title",
+    "description": "Detailed explanation of the risk",
+    "file": "path/to/file",
+    "line": number,
+    "recommendation": "How to fix this issue"
+  }
+]
 `.trim();
+
+const TEST_GENERATOR_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Test Architect. Your goal is to generate comprehensive unit and integration tests for the provided code.
+STACK: Vitest, React Testing Library, Playwright.
+
+TASK:
+1. ANALYZE the logic and edge cases of the provided files.
+2. GENERATE valid TypeScript test files.
+3. ENSURE tests cover primary user flows and error states.
+
+OUTPUT FORMAT:
+Return ONLY a JSON object:
+{
+  "files": [
+    { "path": "path/to/test.test.tsx", "content": "string" }
+  ]
+}
+`.trim();
+
+const PERFORMANCE_AGENT_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Performance Optimization Agent. Your goal is to identify bottlenecks and suggest optimizations.
+STACK: Next.js 14, React Server Components, Tailwind.
+
+TASK:
+1. ANALYZE component rendering, bundle size potential, and data fetching strategies.
+2. IDENTIFY unnecessary re-renders, missing 'use memo', or opportunities for Server Components.
+3. PROVIDE actionable optimizations.
+
+OUTPUT FORMAT:
+Return ONLY a JSON array of optimization objects:
+[
+  {
+    "type": "performance",
+    "message": "Description of the bottleneck",
+    "file": "path/to/file",
+    "suggestion": "Specific code fix or architectural change"
+  }
+]
+`.trim();
+
 
 const MARKETING_PSY_SYSTEM_PROMPT = `
 You are the NEXUS PRIME Marketing Psychology Agent. Your goal is to optimize the UI for conversion, engagement, and user retention.
@@ -232,14 +292,6 @@ Focus on:
 
 STACK: Next.js 14, TypeScript.
 OUTPUT: Return ONLY a JSON object with the SEO-optimized files.
-`.trim();
-
-const TEST_GENERATOR_SYSTEM_PROMPT = `
-...
-`.trim();
-
-const PERFORMANCE_AGENT_SYSTEM_PROMPT = `
-...
 `.trim();
 
 const COMPONENT_PARSER_SYSTEM_PROMPT = `
@@ -493,7 +545,7 @@ export class NexusOrchestrator {
       if (data.error) throw new Error(data.error.message || 'Gemini Vision API Error');
       return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Vision analysis returned empty result.';
     } catch (e: any) {
-      console.error('Gemini Vision Error:', e);
+      // PROD FIX: Removed console.error for production
       throw new Error(`Vision Analysis Failed: ${e.message}`);
     }
   }
@@ -533,7 +585,7 @@ export class NexusOrchestrator {
       const jsonMatch = auditResponse.match(/\[[\s\S]*\]/);
       return JSON.parse(jsonMatch ? jsonMatch[0] : auditResponse);
     } catch (e) {
-      console.error('Audit Parse Error:', e);
+      // PROD FIX: Removed console.error for production
       return [];
     }
   }
@@ -564,7 +616,7 @@ export class NexusOrchestrator {
       const data = JSON.parse(jsonMatch ? jsonMatch[0] : response);
       return data.files || [];
     } catch (e) {
-      console.error('Test Generation Parse Error:', e);
+      // PROD FIX: Removed console.error for production
       return [];
     }
   }
@@ -589,7 +641,7 @@ export class NexusOrchestrator {
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       return JSON.parse(jsonMatch ? jsonMatch[0] : response);
     } catch (e) {
-      console.error('Deployment Analysis Error:', e);
+      // PROD FIX: Removed console.error for production
       return { status: 'error', summary: 'Failed to analyze logs.' };
     }
   }
@@ -607,7 +659,7 @@ export class NexusOrchestrator {
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       return JSON.parse(jsonMatch ? jsonMatch[0] : response);
     } catch (e) {
-      console.error('Prop Parsing Error:', e);
+      // PROD FIX: Removed console.error for production
       return { props: [] };
     }
   }
@@ -707,7 +759,7 @@ export class NexusOrchestrator {
         deploymentId: data.id,
       };
     } catch (e: any) {
-      console.error('Vercel API Error:', e);
+      // PROD FIX: Removed console.error for production
       throw e;
     }
   }
@@ -757,7 +809,7 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
       const jsonString = jsonMatch ? jsonMatch[0] : response;
       return JSON.parse(jsonString);
     } catch (e) {
-      console.error("Failed to parse DevOps Agent response:", response);
+      // PROD FIX: Removed console.error for production
       throw new Error("AI failed to produce a structured fix. Please check the logs manually.");
     }
   }
@@ -782,7 +834,7 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
         const result = JSON.parse(jsonString);
         results.push(...result.files);
       } catch (e) {
-        console.error("Figma conversion failed for node:", node.name, e);
+        // PROD FIX: Removed console.error for production
       }
     }
 
@@ -843,7 +895,7 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
       await this.logEvent(jobId, 'Database Architect', 'completion', `Generated schema with ${result.files?.length || 0} files.`);
       return result;
     } catch (e) {
-      console.error("Database Architect parsing failed:", response);
+      // PROD FIX: Removed console.error for production
       throw new Error("AI failed to produce a structured database design.");
     }
   }
@@ -879,7 +931,7 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
       await this.logEvent(jobId, 'Documentation Agent', 'completion', `Generated ${result.files?.length || 0} docs and ${result.components?.length || 0} component specs.`);
       return result;
     } catch (e) {
-      console.error("Documentation Agent parsing failed:", response);
+      // PROD FIX: Removed console.error for production
       throw new Error("AI failed to produce structured documentation.");
     }
   }

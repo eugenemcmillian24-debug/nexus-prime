@@ -19,28 +19,23 @@ export default async function DashboardPage({
 
   const projectId = searchParams.project;
 
-  // If no project ID is provided, show the Project Hub
-  if (!projectId) {
-    return <ProjectHub />;
-  }
-
-  // Fetch project details for the editor
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, name, current_version")
-    .eq("id", projectId)
-    .single();
-
-  if (!project) {
-    return <ProjectHub />;
+  let project = null;
+  if (projectId) {
+    const { data } = await supabase
+      .from("projects")
+      .select("id, name, current_version")
+      .eq("id", projectId)
+      .single();
+    project = data;
   }
 
   return (
     <AppLayout
       userId={user.id}
-      projectId={project.id}
-      projectName={project.name}
-      initialVersion={project.current_version || 1}
+      projectId={project?.id || undefined}
+      projectName={project?.name || undefined}
+      initialVersion={project?.current_version || 1}
+      initialView={projectId ? "editor" : "home"}
     />
   );
 }

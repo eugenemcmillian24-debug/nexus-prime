@@ -77,50 +77,52 @@ export default function ProjectHub() {
   );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#888] font-mono p-8 selection:bg-[#00ff8822] selection:text-[#00ff88]">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-[#050505] text-[#a3a3a3] font-sans p-10 selection:bg-[#00ff8822] selection:text-[#00ff88] relative z-10">
+      <div className="max-w-7xl mx-auto space-y-12 animate-in fade-in duration-700">
         {/* Header */}
-        <header className="flex justify-between items-center border-b border-[#1a1a1a] pb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#00ff88] rounded-sm flex items-center justify-center text-black font-bold text-xl">N</div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tighter text-white uppercase tracking-widest">Project Hub</h1>
-              <p className="text-[10px] text-[#444] uppercase tracking-[0.2em]">Central Command & Control</p>
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 border-b border-white/5 pb-10">
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#00ff88] rounded-2xl flex items-center justify-center text-black font-black text-2xl shadow-[0_0_20px_rgba(0,255,136,0.3)]">N</div>
+              <div>
+                <h1 className="text-4xl font-black tracking-tighter text-white uppercase leading-none">Project Hub</h1>
+                <p className="text-[10px] text-[#525252] font-bold uppercase tracking-[0.4em] mt-1">Central Command & Control Layer</p>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#333] group-focus-within:text-[#00ff88] transition-colors" />
-              <input 
-                type="text" 
-                placeholder="Filter sequences..."
+          <div className="flex flex-wrap items-center gap-6 w-full md:w-auto">
+            <div className="relative group/search flex-1 md:flex-none min-w-[300px]">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#444] group-focus-within/search:text-[#00ff88] transition-colors" />
+              <input
+                type="text"
+                placeholder="SEARCH BUILD SEQUENCES..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-[#0a0a0a] border border-[#1a1a1a] pl-10 pr-4 py-2 text-xs text-white outline-none focus:border-[#00ff88] transition-all w-64 rounded-sm"
+                className="w-full bg-white/[0.02] border border-white/5 pl-12 pr-6 py-4 text-[11px] font-bold text-white uppercase tracking-widest outline-none focus:border-[#00ff8833] focus:bg-white/[0.04] transition-all rounded-2xl shadow-xl"
               />
             </div>
 
-            <div className="flex bg-[#0a0a0a] border border-[#1a1a1a] p-1 rounded-sm">
-              <button 
+            <div className="flex items-center gap-2 bg-white/[0.02] border border-white/5 p-1.5 rounded-2xl backdrop-blur-md">
+              <button
                 onClick={() => setViewMode("grid")}
-                className={cn("p-1.5 rounded-sm transition-colors", viewMode === "grid" ? "bg-[#1a1a1a] text-[#00ff88]" : "text-[#333] hover:text-[#555]")}
+                className={cn("p-2.5 rounded-xl transition-all duration-300", viewMode === "grid" ? "bg-[#00ff88] text-black shadow-lg shadow-[#00ff88]/20" : "text-[#444] hover:text-white")}
               >
-                <Grid className="w-4 h-4" />
+                <Grid className="w-5 h-5" />
               </button>
-              <button 
+              <button
                 onClick={() => setViewMode("list")}
-                className={cn("p-1.5 rounded-sm transition-colors", viewMode === "list" ? "bg-[#1a1a1a] text-[#00ff88]" : "text-[#333] hover:text-[#555]")}
+                className={cn("p-2.5 rounded-xl transition-all duration-300", viewMode === "list" ? "bg-[#00ff88] text-black shadow-lg shadow-[#00ff88]/20" : "text-[#444] hover:text-white")}
               >
-                <ListIcon className="w-4 h-4" />
+                <ListIcon className="w-5 h-5" />
               </button>
             </div>
 
-            <Link 
+            <Link
               href="/"
-              className="bg-[#00ff88] text-black px-6 py-2.5 font-bold uppercase tracking-widest text-[11px] flex items-center gap-2 hover:bg-[#00cc6d] transition-all rounded-sm active:scale-95 shadow-[0_0_20px_rgba(0,255,136,0.15)]"
+              className="bg-white text-black px-8 py-4 font-black uppercase tracking-widest text-[11px] flex items-center gap-3 hover:bg-[#00ff88] transition-all rounded-2xl active:scale-95 shadow-2xl"
             >
-              <Plus className="w-4 h-4" strokeWidth={3} />
+              <Plus className="w-5 h-5" strokeWidth={3} />
               New Sequence
             </Link>
           </div>
@@ -128,53 +130,55 @@ export default function ProjectHub() {
 
         {/* Content */}
         {loading ? (
-          <div className="h-96 flex flex-col items-center justify-center space-y-4 opacity-50">
-            <Loader2 className="w-10 h-10 animate-spin text-[#00ff88]" />
-            <p className="text-[10px] uppercase tracking-[0.4em]">Initializing Core Filesystems...</p>
+          <div className="h-[60vh] flex flex-col items-center justify-center gap-6 opacity-80">
+            <div className="w-16 h-16 border-2 border-[#00ff8822] border-t-[#00ff88] rounded-full animate-spin shadow-[0_0_20px_rgba(0,255,136,0.1)]" />
+            <div className="text-[10px] font-black uppercase tracking-[0.5em] text-[#444] animate-pulse">Initializing Core Filesystems...</div>
           </div>
         ) : error ? (
-          <div className="h-96 flex flex-col items-center justify-center space-y-4">
-            <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center text-red-500">
-              <AlertTriangle className="w-8 h-8" />
+          <div className="h-[50vh] flex flex-col items-center justify-center gap-6">
+            <div className="w-20 h-20 bg-red-500/5 border border-red-500/10 rounded-[40px] flex items-center justify-center text-red-500 shadow-2xl">
+              <AlertTriangle className="w-10 h-10" />
             </div>
-            <p className="text-red-500 text-xs font-bold uppercase">{error}</p>
-            <button onClick={fetchProjects} className="text-[10px] text-[#444] hover:text-white uppercase underline">Retry Connection</button>
+            <p className="text-red-400 text-xs font-black uppercase tracking-widest">{error}</p>
+            <button onClick={fetchProjects} className="text-[10px] font-bold text-[#444] hover:text-white uppercase tracking-widest underline transition-colors">Retry Connection</button>
           </div>
         ) : filteredProjects.length === 0 ? (
-          <div className="h-96 flex flex-col items-center justify-center text-center space-y-6 opacity-50">
-            <FolderOpen className="w-16 h-16 text-[#111]" />
-            <div className="space-y-1">
-              <h3 className="text-sm font-bold text-[#444] uppercase tracking-widest">No Sequences Detected</h3>
-              <p className="text-[10px] text-[#222] uppercase tracking-[0.2em]">The database is currently empty or filtered.</p>
+          <div className="h-[50vh] flex flex-col items-center justify-center text-center gap-8 opacity-60">
+            <div className="w-24 h-24 rounded-[48px] bg-white/[0.02] border border-white/5 flex items-center justify-center">
+              <FolderOpen className="w-10 h-10 text-[#222]" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-black text-white uppercase tracking-widest">No Sequences Detected</h3>
+              <p className="text-[10px] text-[#444] font-bold uppercase tracking-[0.3em]">The database is currently empty or filtered.</p>
             </div>
           </div>
         ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {filteredProjects.map((project) => (
-              <ProjectCard 
-                key={project.id} 
-                project={project} 
+              <ProjectCard
+                key={project.id}
+                project={project}
                 onDelete={() => deleteProject(project.id)}
                 isDeleting={deletingId === project.id}
               />
             ))}
           </div>
         ) : (
-          <div className="border border-[#1a1a1a] bg-[#0a0a0a] rounded-sm overflow-hidden animate-in fade-in duration-500">
-            <table className="w-full text-left text-[11px] uppercase tracking-widest">
-              <thead className="bg-[#111] border-b border-[#1a1a1a] text-[#444]">
+          <div className="border border-white/5 bg-white/[0.01] rounded-[32px] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-2xl">
+            <table className="w-full text-left text-[11px] font-bold uppercase tracking-widest">
+              <thead className="bg-white/[0.02] border-b border-white/5 text-[#444]">
                 <tr>
-                  <th className="p-4 font-bold">Sequence Name</th>
-                  <th className="p-4 font-bold">Files</th>
-                  <th className="p-4 font-bold">Last Sync</th>
-                  <th className="p-4 font-bold text-right">Actions</th>
+                  <th className="px-8 py-6">Sequence Name</th>
+                  <th className="px-8 py-6">Architecture</th>
+                  <th className="px-8 py-6">Last Sync</th>
+                  <th className="px-8 py-6 text-right">Protocol</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1a1a1a]">
+              <tbody className="divide-y divide-white/5">
                 {filteredProjects.map((project) => (
-                  <ProjectRow 
-                    key={project.id} 
-                    project={project} 
+                  <ProjectRow
+                    key={project.id}
+                    project={project}
                     onDelete={() => deleteProject(project.id)}
                     isDeleting={deletingId === project.id}
                   />
@@ -185,59 +189,67 @@ export default function ProjectHub() {
         )}
 
         {/* Footer */}
-        <footer className="pt-8 border-t border-[#1a1a1a] text-[10px] uppercase tracking-[0.2em] text-[#333] flex justify-between">
-          <div className="flex gap-4">
-            <span>Core Storage: Connected</span>
-            <span className="text-[#111]">Total Sequences: {projects.length}</span>
+        <footer className="pt-12 border-t border-white/5 text-[9px] font-black uppercase tracking-[0.4em] text-[#222] flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex gap-8">
+            <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-[#00ff88]" /> Core Storage: Connected</span>
+            <span>Total Sequences: {projects.length}</span>
           </div>
-          <span>© 2026 NEXUS PRIME OS</span>
+          <span>© 2026 NEXUS PRIME OS // ROOT ACCESS</span>
         </footer>
       </div>
     </div>
   );
+
 }
 
 function ProjectCard({ project, onDelete, isDeleting }: { project: Project; onDelete: () => void; isDeleting: boolean }) {
   return (
-    <div className="group bg-[#0a0a0a] border border-[#1a1a1a] hover:border-[#00ff8844] transition-all relative overflow-hidden rounded-sm flex flex-col h-64">
-      {/* Visual Metaphor / Thumbnail Placeholder */}
-      <div className="h-32 bg-[#050505] border-b border-[#1a1a1a] flex items-center justify-center group-hover:bg-[#00ff8803] transition-colors relative overflow-hidden">
-        <Code2 className="w-12 h-12 text-[#111] group-hover:text-[#00ff8811] transition-all group-hover:scale-110" />
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-black/80 to-transparent flex items-end p-4">
-          <Link 
+    <div className="group relative bg-white/[0.015] border border-white/5 hover:border-[#00ff8844] transition-all duration-500 overflow-hidden rounded-[32px] flex flex-col h-80 shadow-2xl hover:-translate-y-2">
+      {/* Background Glow */}
+      <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#00ff8808] rounded-full blur-3xl group-hover:bg-[#00ff8815] transition-all duration-700" />
+      
+      {/* Visual Metaphor */}
+      <div className="h-40 bg-black/40 border-b border-white/5 flex items-center justify-center group-hover:bg-black/20 transition-all relative overflow-hidden">
+        <div className="relative z-10 transition-transform duration-700 group-hover:scale-125">
+          <Code2 className="w-14 h-14 text-[#222] group-hover:text-[#00ff8822]" />
+        </div>
+        
+        {/* Launch Overlay */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-500 bg-gradient-to-t from-black via-black/40 to-transparent flex items-end justify-center p-8 backdrop-blur-[2px]">
+          <Link
             href={`/dashboard?project=${project.id}`}
-            className="w-full bg-white text-black py-2 text-[9px] font-bold uppercase tracking-[0.3em] text-center hover:bg-[#00ff88] transition-colors"
+            className="w-full bg-[#00ff88] text-black py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] text-center shadow-2xl hover:bg-white transition-all active:scale-95"
           >
-            Launch Sequence
+            Launch Protocol
           </Link>
         </div>
       </div>
 
-      <div className="p-5 flex-1 flex flex-col justify-between">
-        <div className="space-y-2">
-          <div className="flex justify-between items-start">
-            <h3 className="text-white font-bold text-sm tracking-tight truncate pr-4">{project.name}</h3>
-            <div className="flex gap-2">
-              <button 
-                onClick={onDelete}
-                disabled={isDeleting}
-                className="text-[#333] hover:text-red-500 transition-colors disabled:opacity-50"
-              >
-                {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-              </button>
-            </div>
+      <div className="p-8 flex-1 flex flex-col justify-between relative z-10">
+        <div className="space-y-3">
+          <div className="flex justify-between items-start gap-4">
+            <h3 className="text-white font-black text-lg tracking-tight truncate leading-none uppercase">{project.name}</h3>
+            <button
+              onClick={onDelete}
+              disabled={isDeleting}
+              className="p-2 rounded-lg bg-white/5 border border-white/5 text-[#444] hover:text-red-500 hover:bg-red-500/10 transition-all disabled:opacity-50 shrink-0"
+            >
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            </button>
           </div>
-          <p className="text-[10px] text-[#444] line-clamp-2 leading-relaxed uppercase tracking-wider">
-            {project.description || "No description provided for this build sequence."}
+          <p className="text-[10px] text-[#525252] font-bold uppercase tracking-widest line-clamp-2 leading-relaxed">
+            {project.description || "No system documentation provided for this build sequence."}
           </p>
         </div>
 
-        <div className="flex justify-between items-center pt-4 text-[8px] text-[#222] font-bold uppercase tracking-widest border-t border-[#1a1a1a]/50">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(project.updated_at).toLocaleDateString()}</span>
-            <span className="flex items-center gap-1 text-[#444]"><Rocket className="w-3 h-3" /> v{project.current_version || 1}</span>
+        <div className="flex justify-between items-center pt-6 text-[9px] font-black uppercase tracking-[0.3em] border-t border-white/5">
+          <div className="flex items-center gap-5">
+            <span className="flex items-center gap-2 text-[#444]"><Calendar className="w-3.5 h-3.5" /> {new Date(project.updated_at).toLocaleDateString()}</span>
+            <span className="flex items-center gap-2 text-[#00ff88]"><Rocket className="w-3.5 h-3.5" /> V{project.current_version || 1}</span>
           </div>
-          <span className="text-[#00ff8822]">{project.project_files?.[0]?.count || 0} Files</span>
+          <div className="px-3 py-1 rounded-full bg-white/[0.03] border border-white/5 text-[#444]">
+            {project.project_files?.[0]?.count || 0} ARCHIVES
+          </div>
         </div>
       </div>
     </div>
@@ -246,22 +258,37 @@ function ProjectCard({ project, onDelete, isDeleting }: { project: Project; onDe
 
 function ProjectRow({ project, onDelete, isDeleting }: { project: Project; onDelete: () => void; isDeleting: boolean }) {
   return (
-    <tr className="hover:bg-[#111] transition-colors group">
-      <td className="p-4">
-        <div className="flex flex-col">
-          <Link href={`/dashboard?project=${project.id}`} className="text-white font-bold hover:text-[#00ff88] transition-colors">{project.name}</Link>
-          <span className="text-[8px] text-[#333] mt-0.5 lowercase tracking-normal">{project.id}</span>
+    <tr className="hover:bg-white/[0.03] transition-all group">
+      <td className="px-8 py-6">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center text-[#444] group-hover:text-[#00ff88] transition-colors">
+            <Code2 size={20} />
+          </div>
+          <div className="flex flex-col">
+            <Link href={`/dashboard?project=${project.id}`} className="text-white font-black hover:text-[#00ff88] transition-all uppercase tracking-tight text-sm">{project.name}</Link>
+            <span className="text-[9px] font-mono text-[#222] mt-1 tracking-widest group-hover:text-[#444] transition-colors">{project.id}</span>
+          </div>
         </div>
       </td>
-      <td className="p-4 text-[#444] font-bold">{project.project_files?.[0]?.count || 0}</td>
-      <td className="p-4 text-[#444]">{new Date(project.updated_at).toLocaleDateString()}</td>
-      <td className="p-4 text-right">
-        <div className="flex justify-end items-center gap-4">
-          <Link href={`/dashboard?project=${project.id}`} className="text-[#444] hover:text-[#00ff88] transition-colors"><ExternalLink className="w-4 h-4" /></Link>
-          <button 
+      <td className="px-8 py-6">
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#00ff88]/30 border border-[#00ff88]" />
+          <span className="text-[#444] font-black">{project.project_files?.[0]?.count || 0} MODULES</span>
+        </div>
+      </td>
+      <td className="px-8 py-6 text-[#444] font-bold">{new Date(project.updated_at).toLocaleDateString()}</td>
+      <td className="px-8 py-6 text-right">
+        <div className="flex justify-end items-center gap-3">
+          <Link 
+            href={`/dashboard?project=${project.id}`} 
+            className="p-3 rounded-xl bg-white/5 border border-white/5 text-[#444] hover:text-[#00ff88] hover:bg-[#00ff8811] transition-all"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </Link>
+          <button
             onClick={onDelete}
             disabled={isDeleting}
-            className="text-[#444] hover:text-red-500 transition-colors disabled:opacity-50"
+            className="p-3 rounded-xl bg-white/5 border border-white/5 text-[#444] hover:text-red-500 hover:bg-red-500/10 transition-all disabled:opacity-50"
           >
             {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
           </button>
@@ -270,3 +297,4 @@ function ProjectRow({ project, onDelete, isDeleting }: { project: Project; onDel
     </tr>
   );
 }
+

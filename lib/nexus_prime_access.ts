@@ -15,26 +15,30 @@ export async function isNexusPrimeAdmin() {
 
   if (!user) return false;
 
-  // Check for admin role in metadata or a specific admin list
+  // 1. DATABASE CHECK (Primary Authority)
+  const { data: credits } = await supabase
+    .from('user_credits')
+    .select('tier')
+    .eq('user_id', user.id)
+    .single();
+
+  if (credits?.tier === 'Admin') return true;
+
+  // 2. METADATA FALLBACK
   const isAdmin = user.app_metadata?.role === 'admin' || user.user_metadata?.is_admin === true;
+  if (isAdmin) return true;
 
-  // STRICT ADMIN CONTROL: Only this email gets free access
-  const superuserEmails = ['eugenemcmillian24@gmail.com']; 
-
+  // 3. STRICT SUPERUSER OVERRIDE (Legacy/Bootstrap)
+  const superuserEmails = ['eugenemcmillian24@gmail.com'];
   return superuserEmails.includes(user.email || '');
 }
 
 
+
 export async function hasNexusPrimeFreeAccess() {
-  const isAdmin = await isNexusPrimeAdmin();
-  if (isAdmin) return true; // Admins always have free access
-
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  // Check for "Free Plan" flag in metadata
-  return user.app_metadata?.plan === 'free_admin';
+  // Free access has been deprecated. All users must pay.
+  // Only Admins retain unrestricted access.
+  return await isNexusPrimeAdmin();
 }
 
 /**

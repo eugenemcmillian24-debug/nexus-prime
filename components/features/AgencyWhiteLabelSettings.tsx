@@ -39,7 +39,8 @@ export default function AgencyWhiteLabelSettings() {
         }
       }
     } catch (err) {
-      console.error('Failed to fetch agency settings', err);
+      // PROD FIX: Removed console.error for production
+      // console.error('Failed to fetch agency settings', err);
     } finally {
       setLoading(false);
     }
@@ -77,10 +78,13 @@ export default function AgencyWhiteLabelSettings() {
           <h2 className="text-xl font-bold">Agency Mode Inactive</h2>
         </div>
         <p className="text-zinc-400 mb-6">
-          Upgrade to Agency Mode ($49/mo) to unlock full white-labeling, custom branding, and removal of all Nexus Prime references from your generated applications.
+          NEXUS PRIME is a premium-only platform. Upgrade to Agency Mode ($49/mo) to unlock full white-labeling, custom branding, and removal of all platform references from your generated applications.
         </p>
-        <button className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold transition-all">
-          Upgrade to Agency Mode
+        <button 
+          onClick={() => (window as any).setActiveTab?.('pricing')}
+          className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold transition-all"
+        >
+          View Agency Plans
         </button>
       </div>
     );

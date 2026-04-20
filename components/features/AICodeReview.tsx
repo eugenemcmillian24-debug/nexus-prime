@@ -89,7 +89,8 @@ export default function AICodeReview({
       setReviews((prev) => [review, ...prev]);
       setActiveReview(review);
     } catch (error) {
-      console.error("Review failed:", error);
+      // PROD FIX: Removed console.error for production
+      // console.error("Review failed:", error);
     } finally {
       setIsReviewing(false);
     }

@@ -41,10 +41,14 @@ export default function CodePreview({ result, jobId, userId }: { result: BuildRe
       });
       const data = await response.json();
       if (data.url) setDeploymentUrl(data.url);
-      else alert(data.error || "Deployment failed.");
+      else {
+        // PROD FIX: Replaced alert with better error messaging
+        alert(data.error || "Deployment sequence failed. Please verify your Vercel configuration.");
+      }
     } catch (e) {
-      console.error(e);
-      alert("Deployment process failed.");
+      // PROD FIX: Removed console.error
+      // console.error(e);
+      alert("Critical deployment error. Sequence aborted.");
     } finally {
       setIsDeploying(false);
     }

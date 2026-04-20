@@ -259,82 +259,90 @@ export default function MultiFileEditor({
 
   if (loading) {
     return (
-      <div className="h-[700px] bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg flex items-center justify-center">
-        <Loader2 className="w-5 h-5 text-[#00ff88] animate-spin" />
+      <div className="h-[700px] bg-white/[0.01] border border-white/5 rounded-[32px] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#00ff88] animate-spin opacity-50" />
       </div>
     );
   }
 
   return (
-    <div className="h-[700px] bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-500">
+    <div className="h-[700px] bg-white/[0.015] border border-white/5 rounded-[32px] overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-700 shadow-2xl relative z-10">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[#111] border-b border-[#1a1a1a]">
-        <div className="flex items-center gap-3">
-          <FileCode size={14} className="text-[#00ff88]" />
-          <span className="text-[10px] uppercase font-bold tracking-widest text-[#555]">
-            Multi-File Editor
-          </span>
-        </div>
+      <div className="flex items-center justify-between px-8 py-4 bg-white/[0.02] border-b border-white/5 backdrop-blur-md">
         <div className="flex items-center gap-4">
+          <div className="w-8 h-8 rounded-xl bg-[#00ff8811] flex items-center justify-center text-[#00ff88]">
+            <FileCode size={16} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">
+              Nexus Source Engine
+            </span>
+            <span className="text-[8px] font-bold text-[#444] uppercase tracking-widest">Multi-Agent Synchronized Workspace</span>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-6">
           {/* Collaborators Stack */}
-          <div className="flex items-center -space-x-1.5 mr-2">
+          <div className="flex items-center -space-x-2 mr-2">
             {collaborators.filter(c => c.id !== userId).slice(0, 5).map((collab) => (
-              <div 
+              <div
                 key={collab.id}
-                className="w-5 h-5 rounded-full border-2 border-[#111] flex items-center justify-center text-[8px] font-bold text-white shadow-sm transition-transform hover:-translate-y-0.5 cursor-help"
-                style={{ background: collab.color }}
+                className="w-7 h-7 rounded-full border-2 border-black flex items-center justify-center text-[9px] font-black text-white shadow-xl transition-transform hover:-translate-y-1 cursor-help"
+                style={{ background: collab.color || '#333' }}
                 title={`${collab.name} is editing ${collab.activeFile || "nothing"}`}
               >
                 {collab.name.charAt(0).toUpperCase()}
               </div>
             ))}
             {collaborators.filter(c => c.id !== userId).length > 5 && (
-              <div className="w-5 h-5 rounded-full border-2 border-[#111] bg-[#222] flex items-center justify-center text-[7px] font-bold text-[#555]">
+              <div className="w-7 h-7 rounded-full border-2 border-black bg-[#111] flex items-center justify-center text-[8px] font-black text-[#444]">
                 +{collaborators.length - 5}
               </div>
             )}
           </div>
 
-          {saveStatus === "saved" && (
-            <span className="text-[10px] text-[#00ff88] flex items-center gap-1">
-              <Check size={10} /> Saved
-            </span>
-          )}
-          {saveStatus === "error" && (
-            <span className="text-[10px] text-red-400 flex items-center gap-1">
-              <AlertCircle size={10} /> Error
-            </span>
-          )}
-          {unsavedChanges.size > 0 && (
-            <span className="text-[10px] text-yellow-500">
-              {unsavedChanges.size} unsaved
-            </span>
-          )}
-          {!readOnly && (
-            <button
-              onClick={saveAllFiles}
-              disabled={saving}
-              className="text-[10px] uppercase font-bold tracking-widest text-[#555] hover:text-[#00ff88] transition-colors flex items-center gap-1.5 px-2 py-1"
-            >
-              {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-              Save All
-            </button>
-          )}
-          {onBuild && (
-            <button
-              onClick={() => onBuild(files)}
-              className="text-[10px] uppercase font-bold tracking-widest bg-[#00ff88] text-black px-3 py-1.5 rounded-[2px] hover:bg-[#00ff99] transition-colors flex items-center gap-1.5"
-            >
-              <Play size={12} /> Build
-            </button>
-          )}
+          <div className="h-6 w-px bg-white/5 mx-2" />
+
+          <div className="flex items-center gap-4">
+            {saveStatus === "saved" && (
+              <span className="text-[9px] font-black text-[#00ff88] uppercase tracking-widest flex items-center gap-1.5 bg-[#00ff880a] px-3 py-1.5 rounded-full border border-[#00ff8811]">
+                <Check size={10} strokeWidth={4} /> Verified
+              </span>
+            )}
+            {unsavedChanges.size > 0 && (
+              <span className="text-[9px] font-black text-yellow-500 uppercase tracking-widest flex items-center gap-1.5 bg-yellow-500/5 px-3 py-1.5 rounded-full border border-yellow-500/10">
+                {unsavedChanges.size} Unsynced
+              </span>
+            )}
+            
+            {!readOnly && (
+              <button
+                onClick={saveAllFiles}
+                disabled={saving}
+                className="text-[10px] font-black uppercase tracking-[0.15em] text-[#525252] hover:text-[#00ff88] transition-all flex items-center gap-2 group"
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="group-hover:scale-110 transition-transform" />}
+                Sync
+              </button>
+            )}
+            
+            {onBuild && (
+              <button
+                onClick={() => onBuild(files)}
+                className="bg-[#00ff88] text-black px-6 py-2.5 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:bg-white transition-all shadow-xl active:scale-95"
+              >
+                <Play size={12} fill="currentColor" />
+                Deploy Build
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
         {/* File explorer sidebar */}
-        <div className="w-56 flex-shrink-0">
+        <div className="w-64 flex-shrink-0 bg-black/20 border-r border-white/5">
           <FileExplorer
             files={files}
             activeFile={activeTab}
@@ -347,57 +355,66 @@ export default function MultiFileEditor({
         </div>
 
         {/* Editor area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden bg-black/40">
           {/* Tabs */}
-          <div className="flex bg-[#0a0a0a] border-b border-[#1a1a1a] overflow-x-auto">
-            {openTabs.map((tab) => (
-              <div
-                key={tab}
-                className={`flex items-center gap-2 px-3 py-2 cursor-pointer border-r border-[#1a1a1a] min-w-0 ${
-                  tab === activeTab
-                    ? "bg-[#111] text-white border-b-2 border-b-[#00ff88]"
-                    : "text-[#555] hover:text-[#888] hover:bg-[#0d0d0d]"
-                }`}
-                onClick={() => setActiveTab(tab)}
-              >
-                <span className="text-xs truncate max-w-[120px]">
-                  {tab.split("/").pop()}
-                </span>
-                {unsavedChanges.has(tab) && (
-                  <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full flex-shrink-0" />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTab(tab);
-                  }}
-                  className="hover:text-red-400 flex-shrink-0"
+          <div className="flex bg-black/20 border-b border-white/5 overflow-x-auto custom-scrollbar">
+            {openTabs.map((tab) => {
+              const isActive = tab === activeTab;
+              return (
+                <div
+                  key={tab}
+                  className={`group flex items-center gap-3 px-6 py-4 cursor-pointer border-r border-white/5 transition-all relative min-w-0 ${
+                    isActive
+                      ? "bg-white/[0.03] text-white"
+                      : "text-[#444] hover:text-[#888] hover:bg-white/[0.01]"
+                  }`}
+                  onClick={() => setActiveTab(tab)}
                 >
-                  <X size={10} />
-                </button>
-              </div>
-            ))}
+                  {isActive && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00ff88] shadow-[0_0_10px_#00ff88]" />
+                  )}
+                  <span className={`text-[11px] font-bold uppercase tracking-widest truncate max-w-[150px] ${isActive ? 'text-[#00ff88]' : ''}`}>
+                    {tab.split("/").pop()}
+                  </span>
+                  {unsavedChanges.has(tab) && (
+                    <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTab(tab);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all ml-2"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           {/* Code editor */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto relative custom-scrollbar">
             {activeFile ? (
-              <div className="relative h-full">
-                <div className="absolute top-2 right-3 text-[10px] text-[#333]">
+              <div className="h-full relative group/editor">
+                <div className="absolute top-4 right-8 z-10 px-3 py-1 rounded-full bg-white/5 border border-white/5 text-[9px] font-black text-[#222] uppercase tracking-[0.2em] group-hover/editor:text-[#444] transition-colors">
                   {activeFile.language || detectLanguage(activeFile.path)}
                 </div>
                 <textarea
                   value={activeFile.content}
                   onChange={(e) => updateFileContent(activeTab, e.target.value)}
                   readOnly={readOnly}
-                  className="w-full h-full bg-transparent text-[#ccc] font-mono text-sm p-4 resize-none outline-none leading-6"
+                  className="w-full h-full bg-transparent text-[#d4d4d4] font-mono text-[13px] p-10 resize-none outline-none leading-7 selection:bg-[#00ff8822]"
                   spellCheck={false}
                   style={{ tabSize: 2 }}
                 />
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-[#333] text-sm">
-                Select a file to edit
+              <div className="flex flex-col items-center justify-center h-full gap-4 opacity-30">
+                <div className="w-16 h-16 rounded-[32px] border border-white/5 flex items-center justify-center">
+                  <FileCode size={32} />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-[0.4em]">Initialize sequence selection...</p>
               </div>
             )}
           </div>
