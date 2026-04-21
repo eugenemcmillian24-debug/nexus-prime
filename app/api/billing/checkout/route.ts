@@ -5,9 +5,14 @@ import { CheckoutSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
 import { isNexusPrimeAdmin } from '@/lib/nexus_prime_access';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16' as any,
-});
+// PROD FIX: Lazy-init Stripe so missing key only fails at request-time, not build-time
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured. Add it to your environment variables.');
+  return new Stripe(key, { apiVersion: '2023-10-16' as any });
+}
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
@@ -80,6 +85,7 @@ export async function POST(req: Request) {
 
     metadata.credits = credits.toString();
 
+    const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],

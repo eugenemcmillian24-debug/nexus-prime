@@ -92,13 +92,14 @@ export default function LandingPage() {
 
   if (showAuth) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6">
-        <div className="absolute top-8 left-8">
-          <button 
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 relative">
+        <div className="fixed inset-0 grid-bg opacity-10 pointer-events-none" />
+        <div className="absolute top-8 left-8 z-10">
+          <button
             onClick={() => setShowAuth(false)}
-            className="text-[10px] text-[#444] uppercase tracking-widest hover:text-white transition-colors"
+            className="flex items-center gap-2 text-[10px] font-bold text-[#444] uppercase tracking-widest hover:text-[#00ff88] transition-colors"
           >
-            [ ← Return to Intelligence Overview ]
+            <ArrowRight size={10} className="rotate-180" /> Back to Overview
           </button>
         </div>
         <Login />

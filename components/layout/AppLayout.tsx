@@ -493,7 +493,7 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
           zIndex: 100,
           height: "100%",
           background: "rgba(10,10,10,0.8)",
-          backdropBlur: "20px",
+          backdropFilter: "blur(20px)",
         }}
       >
         {/* Logo */}
@@ -511,10 +511,10 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
             }}>N</div>
             {!sidebarCollapsed && (
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: "14px", fontWeight: 900, color: "#fff", tracking: "-0.02em", textTransform: "uppercase" }}>
+                <span style={{ fontSize: "14px", fontWeight: 900, color: "#fff", letterSpacing: "-0.02em", textTransform: "uppercase" }}>
                   Nexus Prime
                 </span>
-                <span style={{ fontSize: "8px", fontWeight: 700, color: "#00ff88", tracking: "0.2em" }}>SYSTEM v2.4</span>
+                <span style={{ fontSize: "8px", fontWeight: 700, color: "#00ff88", letterSpacing: "0.2em" }}>SYSTEM v2.4</span>
               </div>
             )}
           </Link>

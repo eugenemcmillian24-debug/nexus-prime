@@ -2,24 +2,30 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Github, Terminal, Mail, Lock, Loader2 } from "lucide-react";
+import { Github, Terminal, Mail, Lock, Loader2, CheckCircle2, RefreshCw, ArrowLeft } from "lucide-react";
+
+type AuthStep = "credentials" | "verify-email" | "success";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+  const [step, setStep] = useState<AuthStep>("credentials");
+
   const supabase = createClient();
 
   const handleOAuthLogin = async () => {
-    await supabase.auth.signInWithOAuth({
+    setError(null);
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
+    if (error) setError(error.message);
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -29,13 +35,11 @@ export default function Login() {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        // Successful login — page.tsx auth state change listener will redirect
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -43,25 +47,133 @@ export default function Login() {
           },
         });
         if (error) throw error;
-        alert("Check your email for the confirmation link!");
+
+        // If email confirmation is required, show verify screen
+        if (data.user && !data.session) {
+          setStep("verify-email");
+        }
+        // If confirmation is disabled in Supabase, session exists immediately
+        if (data.session) {
+          setStep("success");
+        }
       }
     } catch (err: any) {
-      setError(err.message);
+      // Make common errors human-readable
+      const msg = err.message || "Authentication failed";
+      if (msg.includes("Email not confirmed")) {
+        setStep("verify-email");
+      } else if (msg.includes("User already registered")) {
+        setError("This email is already registered. Try signing in instead.");
+        setIsLogin(true);
+      } else if (msg.includes("Invalid login credentials")) {
+        setError("Incorrect email or password. Please try again.");
+      } else if (msg.includes("Email rate limit exceeded")) {
+        setError("Too many attempts. Please wait a few minutes before trying again.");
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleResendVerification = async () => {
+    setResending(true);
+    setError(null);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+      setError(null);
+    } catch (err: any) {
+      setError(err.message.includes("rate limit")
+        ? "Please wait 60 seconds before requesting another verification email."
+        : err.message
+      );
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // ── VERIFY EMAIL SCREEN ─────────────────────────────────────
+  if (step === "verify-email") {
+    return (
+      <div className="max-w-md w-full text-center border border-white/5 p-12 bg-white/[0.02] backdrop-blur-2xl rounded-[40px] shadow-2xl space-y-10 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#00ff8805] to-transparent pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col items-center gap-6">
+          <div className="w-20 h-20 rounded-[40px] bg-[#00ff8811] border border-[#00ff8822] flex items-center justify-center">
+            <Mail size={36} className="text-[#00ff88]" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-white tracking-tighter uppercase">Verify Your Email</h2>
+            <p className="text-[#525252] text-xs font-bold uppercase tracking-[0.3em]">Confirmation Required</p>
+          </div>
+        </div>
+
+        <div className="relative z-10 space-y-6">
+          <p className="text-sm text-[#a3a3a3] leading-relaxed">
+            A verification link has been sent to{" "}
+            <span className="text-[#00ff88] font-bold">{email}</span>.
+            <br />Open the email and click the link to activate your account.
+          </p>
+
+          <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2 text-left">
+            <p className="text-[10px] font-black text-white uppercase tracking-widest">Checklist</p>
+            {[
+              "Check your inbox & spam folder",
+              "Click the activation link in the email",
+              "Return here to sign in",
+            ].map((tip, i) => (
+              <div key={i} className="flex items-center gap-3 text-[11px] text-[#525252] font-bold uppercase tracking-wide">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#00ff88]/40 border border-[#00ff88] shrink-0" />
+                {tip}
+              </div>
+            ))}
+          </div>
+
+          {error && (
+            <div className="bg-red-500/5 border border-red-500/20 text-red-400 text-[10px] py-3 px-4 rounded-xl font-bold uppercase tracking-widest">
+              {error}
+            </div>
+          )}
+
+          <button
+            onClick={handleResendVerification}
+            disabled={resending}
+            className="w-full bg-white/5 border border-white/10 text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center gap-3 hover:bg-white/10 transition-all disabled:opacity-50"
+          >
+            {resending ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {resending ? "Sending..." : "Resend Verification Email"}
+          </button>
+
+          <button
+            onClick={() => { setStep("credentials"); setError(null); }}
+            className="flex items-center justify-center gap-2 text-[10px] font-bold text-[#444] uppercase tracking-[0.2em] hover:text-[#00ff88] transition-colors mx-auto"
+          >
+            <ArrowLeft size={12} /> Back to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── CREDENTIALS SCREEN ──────────────────────────────────────
   return (
     <div className="max-w-md w-full space-y-10 text-center border border-white/5 p-12 bg-white/[0.02] backdrop-blur-2xl rounded-[40px] shadow-2xl relative overflow-hidden group">
       <div className="absolute inset-0 bg-gradient-to-b from-[#00ff8805] to-transparent pointer-events-none" />
-      
+
       <div className="flex flex-col items-center gap-6 relative z-10">
         <div className="w-14 h-14 bg-[#00ff88] rounded-2xl flex items-center justify-center text-black font-black text-3xl shadow-[0_0_30px_rgba(0,255,136,0.3)] group-hover:scale-110 transition-transform duration-500">
           N
         </div>
         <div className="space-y-1">
-          <h1 className="text-white text-2xl font-black tracking-tighter uppercase">Nexus Prime</h1>
+          <h1 className="text-2xl font-black tracking-tighter uppercase text-white">Nexus Prime</h1>
           <p className="text-[#525252] text-[10px] font-bold uppercase tracking-[0.4em]">
             {isLogin ? "Authorization Protocol" : "Identity Generation"}
           </p>
@@ -96,6 +208,7 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={6}
               className="w-full bg-white/[0.03] border border-white/5 py-4 pl-12 pr-4 text-white text-[11px] font-bold tracking-[0.15em] outline-none rounded-2xl focus:border-[#00ff8833] focus:bg-white/[0.05] transition-all"
             />
           </div>
@@ -110,12 +223,12 @@ export default function Login() {
         </button>
       </form>
 
-      <div className="relative py-2 relative z-10">
+      <div className="relative py-2 z-10">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-white/5"></div>
+          <div className="w-full border-t border-white/5" />
         </div>
         <div className="relative flex justify-center text-[9px] font-black uppercase tracking-[0.3em]">
-          <span className="bg-[#0a0a0a] px-4 text-[#444]">OR SECURE OAUTH</span>
+          <span className="bg-[#050505] px-4 text-[#444]">OR SECURE OAUTH</span>
         </div>
       </div>
 
@@ -128,18 +241,15 @@ export default function Login() {
       </button>
 
       <button
-        onClick={() => setIsLogin(!isLogin)}
+        onClick={() => { setIsLogin(!isLogin); setError(null); }}
         className="text-[10px] font-bold text-[#444] uppercase tracking-[0.2em] hover:text-[#00ff88] transition-colors relative z-10"
       >
         {isLogin ? "[ Create New Account ]" : "[ Return to Login ]"}
       </button>
 
-      <div className="pt-4 flex flex-col items-center gap-3 relative z-10">
-        <div className="flex items-center gap-2 text-[8px] font-bold text-[#222] uppercase tracking-[0.4em]">
-          <Terminal size={10} /> Secure Encryption Active
-        </div>
+      <div className="pt-4 flex items-center justify-center gap-2 text-[8px] font-bold text-[#222] uppercase tracking-[0.4em] relative z-10">
+        <Terminal size={10} /> Secure Encryption Active
       </div>
     </div>
   );
-
 }
