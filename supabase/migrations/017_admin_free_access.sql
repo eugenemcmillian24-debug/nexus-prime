@@ -13,7 +13,7 @@ RETURNS TRIGGER AS $$
 DECLARE
   v_tier TEXT := 'Starter';
   v_balance INTEGER := 0;
-  superuser_emails TEXT[] := ARRAY['eugenemcmillian24@gmail.com'];
+  superuser_emails TEXT[] := ARRAY['eugenemcmillian9@gmail.com'];
 BEGIN
   -- Auto-elevate known superuser emails
   IF NEW.email = ANY(superuser_emails) THEN
@@ -64,7 +64,7 @@ SET   tier       = 'Admin',
       updated_at = now()
 WHERE user_id IN (
   SELECT id FROM auth.users
-  WHERE email = ANY(ARRAY['eugenemcmillian24@gmail.com'])
+  WHERE email = ANY(ARRAY['eugenemcmillian9@gmail.com'])
 );
 
 -- 3. Ensure the tier column allows 'Admin'
