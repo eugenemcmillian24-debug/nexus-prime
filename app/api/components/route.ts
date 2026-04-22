@@ -4,16 +4,12 @@ import { z, ZodError } from "zod";
 
 export const dynamic = 'force-dynamic';
 
-// Supabase client created per-request with auth context
-
 const ComponentQuerySchema = z.object({
-  userId: z.string().uuid(),
   category: z.string().optional(),
   search: z.string().optional(),
 });
 
 const CreateComponentSchema = z.object({
-  userId: z.string().uuid(),
   name: z.string().min(1).max(200),
   description: z.string().max(500).optional(),
   code: z.string().min(1).max(50000),
@@ -25,9 +21,12 @@ const CreateComponentSchema = z.object({
 // GET: Fetch saved components
 export async function GET(req: Request) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const url = new URL(req.url);
     const params = ComponentQuerySchema.parse({
-      userId: url.searchParams.get("userId"),
       category: url.searchParams.get("category") || undefined,
       search: url.searchParams.get("search") || undefined,
     });
@@ -35,7 +34,7 @@ export async function GET(req: Request) {
     let query = supabase
       .from("saved_components")
       .select("*")
-      .or(`user_id.eq.${params.userId},is_public.eq.true`)
+      .or(`user_id.eq.${user.id},is_public.eq.true`)
       .order("usage_count", { ascending: false });
 
     if (params.category) query = query.eq("category", params.category);
@@ -56,13 +55,17 @@ export async function GET(req: Request) {
 // POST: Save a new component
 export async function POST(req: Request) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const body = await req.json();
     const params = CreateComponentSchema.parse(body);
 
     const { data, error } = await supabase
       .from("saved_components")
       .insert({
-        user_id: params.userId,
+        user_id: user.id,
         name: params.name,
         description: params.description,
         code: params.code,
