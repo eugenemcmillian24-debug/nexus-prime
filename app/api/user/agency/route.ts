@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     .eq('user_id', user.id)
     .single();
 
-  if (!credits?.agency_mode && credits?.tier !== 'Admin') {
+  if (!credits?.agency_mode && credits?.tier !== 'admin') {
     return NextResponse.json({ error: 'Forbidden: Agency Mode is required to modify branding settings.' }, { status: 403 });
   }
 

@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     // SECURITY GATE: Prevent using admin token for user exports unless user is admin
     if (!ghToken) {
         const { data: credits } = await supabase.from('user_credits').select('tier').eq('user_id', userId).single();
-        if (credits?.tier === 'Admin') {
+        if (credits?.tier === 'admin') {
             ghToken = process.env.GITHUB_TOKEN ?? null;
         }
     }

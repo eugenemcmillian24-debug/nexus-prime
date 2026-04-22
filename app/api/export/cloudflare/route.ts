@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     // SECURITY GATE: Prevent using admin token for user exports unless user is admin
     if (!cfToken || !cfAccountId) {
         const { data: credits } = await supabase.from('user_credits').select('tier').eq('user_id', user.id).single();
-        if (credits?.tier === 'Admin') {
+        if (credits?.tier === 'admin') {
             cfToken = cfToken || (process.env.CLOUDFLARE_API_TOKEN ?? null);
             cfAccountId = cfAccountId || (process.env.CLOUDFLARE_ACCOUNT_ID ?? null);
         }

@@ -22,7 +22,7 @@ export async function isNexusPrimeAdmin() {
     .eq('user_id', user.id)
     .single();
 
-  if (credits?.tier === 'Admin') return true;
+  if (credits?.tier === 'admin') return true;
 
   // 2. METADATA FALLBACK
   const isAdmin = user.app_metadata?.role === 'admin' || user.user_metadata?.is_admin === true;

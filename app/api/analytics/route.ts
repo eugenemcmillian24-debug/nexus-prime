@@ -28,7 +28,7 @@ export async function GET(req: Request) {
         // We'll allow the request to proceed if the user is an admin (checked later or via middleware)
         // But for standard users, we force their ID
         const { data: credits } = await supabase.from('user_credits').select('tier').eq('user_id', user.id).single();
-        if (credits?.tier !== 'Admin') {
+        if (credits?.tier !== 'admin') {
             return NextResponse.json({ error: "Forbidden: You can only view your own analytics." }, { status: 403 });
         }
     }

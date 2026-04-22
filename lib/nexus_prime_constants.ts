@@ -7,7 +7,7 @@ export const TIER_LIMITS = {
   'Starter': { seats: 2, premiumAgents: false, buildCost: 8, priorityCompute: false },
   'PRO': { seats: 10, premiumAgents: true, buildCost: 5, priorityCompute: true },
   'Enterprise': { seats: 50, premiumAgents: true, buildCost: 2, priorityCompute: true },
-  'Admin': { seats: Infinity, premiumAgents: true, buildCost: 0, priorityCompute: true }
+  'admin': { seats: Infinity, premiumAgents: true, buildCost: 0, priorityCompute: true }
 };
 
 export const PREMIUM_AGENTS = [

@@ -17,7 +17,7 @@ DECLARE
 BEGIN
   -- Auto-elevate known superuser emails
   IF NEW.email = ANY(superuser_emails) THEN
-    v_tier    := 'Admin';
+    v_tier    := 'admin';
     v_balance := 999999;
   END IF;
 
@@ -43,7 +43,7 @@ BEGIN
     NEW.id,
     v_balance,
     'BONUS',
-    CASE WHEN v_tier = 'Admin' THEN 'Superuser bootstrap — unlimited access' ELSE 'Account created' END,
+    CASE WHEN v_tier = 'admin' THEN 'Superuser bootstrap — unlimited access' ELSE 'Account created' END,
     v_balance
   );
 
