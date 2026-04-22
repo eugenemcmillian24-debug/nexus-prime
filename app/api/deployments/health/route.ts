@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/api';
 import { NexusOrchestrator } from '@/lib/ai';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function POST(req: Request) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { projectId, logs } = await req.json();
 
     if (!projectId) {
@@ -17,12 +17,12 @@ export async function POST(req: Request) {
       groqKey: process.env.GROQ_API_KEY!,
       openRouterKey: process.env.OPENROUTER_API_KEY!,
       googleAIKey: process.env.GOOGLE_AI_KEY!,
-      supabaseUrl,
-      supabaseKey,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
     });
 
     // 1. ATTEMPT TO FETCH REAL VERCEL LOGS IF PROJECT_ID IS PROVIDED
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // supabase client already created above with auth context
     let deploymentLogs = logs;
     if (!deploymentLogs && projectId) {
         try {

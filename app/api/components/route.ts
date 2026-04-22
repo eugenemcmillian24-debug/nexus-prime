@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
 
 export const dynamic = 'force-dynamic';
 
-const supabase = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
-  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
-  : null as any;
+// Supabase client created per-request with auth context
 
 const ComponentQuerySchema = z.object({
   userId: z.string().uuid(),

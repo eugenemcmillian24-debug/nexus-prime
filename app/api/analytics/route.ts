@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,7 @@ const AnalyticsQuerySchema = z.object({
 // GET: Fetch user analytics
 export async function GET(req: Request) {
   try {
-    const supabaseClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const supabaseClient = createClient();
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -64,7 +64,7 @@ const TrackEventSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const supabaseClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const supabaseClient = createClient();
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

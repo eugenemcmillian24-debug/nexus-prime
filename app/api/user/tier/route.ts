@@ -4,16 +4,14 @@ import { TIER_LIMITS } from '@/lib/nexus_prime_access';
 
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
-
     const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { data, error } = await supabase
       .from('user_credits')
       .select('tier, seat_limit_override')
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .single();
 
     if (error) throw error;
