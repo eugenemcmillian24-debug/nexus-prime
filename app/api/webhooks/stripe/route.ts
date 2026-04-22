@@ -4,16 +4,27 @@ import Stripe from 'stripe';
 
 export const dynamic = 'force-dynamic';
 
-const supabase = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
-  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
-  : null as any;
+// Lazy-init to avoid build-time crashes when env vars are missing
+function getSupabase() {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+  }
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
 
-const stripe = (process.env.STRIPE_SECRET_KEY)
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' as any })
-  : null as any;
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('STRIPE_SECRET_KEY is required');
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' as any });
+}
 
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+function getWebhookSecret() {
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    throw new Error('STRIPE_WEBHOOK_SECRET is required');
+  }
+  return process.env.STRIPE_WEBHOOK_SECRET;
+}
 
 // Credit mapping by price ID
 const PRICE_TO_PLAN: Record<string, { tier: string; credits: number }> = {
@@ -29,8 +40,16 @@ const TOPUP_PRICE_TO_CREDITS: Record<string, number> = {
 };
 
 export async function POST(req: Request) {
-  if (!supabase || !stripe) {
-    return NextResponse.json({ error: 'Stripe/Supabase not configured' }, { status: 503 });
+  let supabase: any;
+  let stripe: Stripe;
+  let webhookSecret: string;
+  
+  try {
+    supabase = getSupabase();
+    stripe = getStripe();
+    webhookSecret = getWebhookSecret();
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 503 });
   }
 
   const body = await req.text();
