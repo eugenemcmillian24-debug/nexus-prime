@@ -329,7 +329,17 @@ export default function AdminControlPanel() {
                     <div style={{ fontSize: "10px", color: "#737373" }}>{override.userId.slice(0, 8)}...</div>
                     <div style={{ fontSize: "12px", color: "#00ff88", fontWeight: "bold" }}>{override.seats} SEATS</div>
                   </div>
-                  <button style={{ background: "transparent", border: "none", color: "#ef4444", fontSize: "10px", cursor: "pointer" }}>REMOVE</button>
+                  <button onClick={async () => {
+                    if (!confirm("Remove this seat override?")) return;
+                    try {
+                      await fetch("/api/admin/seat-overrides", {
+                        method: "DELETE",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ userId: override.userId }),
+                      });
+                      setSeatOverrides((prev: any[]) => prev.filter((o: any) => o.userId !== override.userId));
+                    } catch (err) { console.error(err); }
+                  }} style={{ background: "transparent", border: "none", color: "#ef4444", fontSize: "10px", cursor: "pointer" }}>REMOVE</button>
                 </div>
               ))}
               {seatOverrides.length === 0 && <div style={{ fontSize: "11px", color: "#525252", textAlign: "center", padding: "20px" }}>NO OVERRIDES ACTIVE</div>}

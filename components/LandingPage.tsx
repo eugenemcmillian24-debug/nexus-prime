@@ -326,7 +326,7 @@ export default function LandingPage() {
                   <ul className="space-y-4">
                     {col.links.map((link, j) => (
                       <li key={j}>
-                        <a href="#" className="text-[10px] font-bold text-[#444] uppercase tracking-widest hover:text-[#00ff88] transition-colors">{link}</a>
+                        <a href="#" onClick={(e) => e.preventDefault()} className="text-[10px] font-bold text-[#444] uppercase tracking-widest hover:text-[#00ff88] transition-colors cursor-default">{link}</a>
                       </li>
                     ))}
                   </ul>

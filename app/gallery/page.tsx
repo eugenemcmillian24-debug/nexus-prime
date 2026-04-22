@@ -168,10 +168,10 @@ export default function GalleryPage() {
                     </div>
                   )}
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                    <button className="p-2 bg-[#00ff88] text-black rounded-sm hover:bg-[#00cc6a]">
+                    <button onClick={() => build.preview_url && window.open(build.preview_url, "_blank")} className="p-2 bg-[#00ff88] text-black rounded-sm hover:bg-[#00cc6a]" title="Open Preview">
                       <ExternalLink className="w-4 h-4" />
                     </button>
-                    <button className="p-2 bg-white/10 text-white rounded-sm hover:bg-white/20">
+                    <button onClick={() => window.location.href = `/dashboard?id=${build.id}`} className="p-2 bg-white/10 text-white rounded-sm hover:bg-white/20" title="View Source">
                       <Code className="w-4 h-4" />
                     </button>
                   </div>

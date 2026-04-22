@@ -341,8 +341,18 @@ export default function AgentTrainingLab() {
               <div style={{ display: "flex", gap: "12px" }}>
                 {activeTab === "my-modules" ? (
                   <>
-                    <button style={{ background: "none", border: "none", color: "#00ff88", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}>EDIT</button>
-                    <button style={{ background: "none", border: "none", color: "#ff4444", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}>DELETE</button>
+                    <button onClick={() => {
+                      setNewModule(prev => ({ ...prev, name: module.name || "", description: module.description || "" }));
+                      
+                      setShowCreate(true);
+                    }} style={{ background: "none", border: "none", color: "#00ff88", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}>EDIT</button>
+                    <button onClick={async () => {
+                      if (!confirm("Delete this training module?")) return;
+                      try {
+                        await fetch(`/api/agent/training?id=${module.id}`, { method: "DELETE" });
+                        setModules((prev: any[]) => prev.filter((m: any) => m.id !== module.id));
+                      } catch (err) { console.error(err); }
+                    }} style={{ background: "none", border: "none", color: "#ff4444", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}>DELETE</button>
                   </>
                 ) : (
                   <button 
