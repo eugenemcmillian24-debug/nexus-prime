@@ -87,7 +87,6 @@ export default function WebhooksApiAccess({ projectId }: WebhooksApiAccessProps)
       if (whRes.ok) setWebhooks(await whRes.json());
       if (tkRes.ok) setTokens(await tkRes.json());
     } catch (err) {
-      console.error("Failed to fetch:", err);
     } finally {
       setIsLoading(false);
     }
@@ -109,7 +108,6 @@ export default function WebhooksApiAccess({ projectId }: WebhooksApiAccessProps)
         setShowWebhookForm(false);
       }
     } catch (err) {
-      console.error("Create webhook failed:", err);
     }
   };
 
@@ -118,7 +116,6 @@ export default function WebhooksApiAccess({ projectId }: WebhooksApiAccessProps)
       await fetch(`/api/projects/${projectId}/webhooks/${id}`, { method: "DELETE" });
       setWebhooks((prev) => prev.filter((w) => w.id !== id));
     } catch (err) {
-      console.error("Delete webhook failed:", err);
     }
   };
 
@@ -133,7 +130,6 @@ export default function WebhooksApiAccess({ projectId }: WebhooksApiAccessProps)
         prev.map((w) => (w.id === id ? { ...w, isActive: !isActive } : w))
       );
     } catch (err) {
-      console.error("Toggle webhook failed:", err);
     }
   };
 
@@ -157,7 +153,6 @@ export default function WebhooksApiAccess({ projectId }: WebhooksApiAccessProps)
         setTokenScopes([]);
       }
     } catch (err) {
-      console.error("Create token failed:", err);
     }
   };
 
@@ -167,7 +162,6 @@ export default function WebhooksApiAccess({ projectId }: WebhooksApiAccessProps)
       await fetch(`/api/projects/${projectId}/tokens/${id}`, { method: "DELETE" });
       setTokens((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
-      console.error("Revoke failed:", err);
     }
   };
 

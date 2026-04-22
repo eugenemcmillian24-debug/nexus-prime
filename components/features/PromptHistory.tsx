@@ -50,7 +50,6 @@ export default function PromptHistory({ projectId, onReplayPrompt }: PromptHisto
       );
       if (res.ok) setEntries(await res.json());
     } catch (err) {
-      console.error("Failed to fetch history:", err);
     } finally {
       setIsLoading(false);
     }
@@ -69,7 +68,6 @@ export default function PromptHistory({ projectId, onReplayPrompt }: PromptHisto
         prev.map((e) => (e.id === id ? { ...e, starred: !e.starred } : e))
       );
     } catch (err) {
-      console.error("Failed to star:", err);
     }
   };
 
@@ -84,7 +82,6 @@ export default function PromptHistory({ projectId, onReplayPrompt }: PromptHisto
         prev.map((e) => (e.id === id ? { ...e, rating } : e))
       );
     } catch (err) {
-      console.error("Failed to rate:", err);
     }
   };
 
@@ -93,7 +90,6 @@ export default function PromptHistory({ projectId, onReplayPrompt }: PromptHisto
       await fetch(`/api/prompt-history/${id}`, { method: "DELETE" });
       setEntries((prev) => prev.filter((e) => e.id !== id));
     } catch (err) {
-      console.error("Failed to delete:", err);
     }
   };
 
