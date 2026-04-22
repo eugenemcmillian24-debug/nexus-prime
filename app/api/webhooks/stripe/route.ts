@@ -29,6 +29,10 @@ const TOPUP_PRICE_TO_CREDITS: Record<string, number> = {
 };
 
 export async function POST(req: Request) {
+  if (!supabase || !stripe) {
+    return NextResponse.json({ error: 'Stripe/Supabase not configured' }, { status: 503 });
+  }
+
   const body = await req.text();
   const sig = req.headers.get('stripe-signature');
 

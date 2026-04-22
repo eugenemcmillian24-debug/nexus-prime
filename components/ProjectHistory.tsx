@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder"
+  process.env.NEXT_PUBLIC_SUPABASE_URL !,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !
 );
 
 interface Build {

@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-) : null as any; // PROD FIX: Removed placeholders
+const supabase = (() => {
+  if (typeof window === 'undefined') return null as any;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null as any;
+  return createClient(url, key);
+})(); // PROD FIX: Removed placeholders
 
 export default function CreditHistory({ userId }: { userId: string }) {
   const [ledger, setLedger] = useState<any[]>([]);
