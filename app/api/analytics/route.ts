@@ -4,10 +4,6 @@ import { z, ZodError } from "zod";
 
 export const dynamic = 'force-dynamic';
 
-const supabase = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) 
-  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
-  : null as any;
-
 const AnalyticsQuerySchema = z.object({
   userId: z.string().uuid(),
   days: z.number().min(1).max(365).default(30),
@@ -16,17 +12,15 @@ const AnalyticsQuerySchema = z.object({
 // GET: Fetch user analytics
 export async function GET(req: Request) {
   try {
-    const supabaseClient = createClient();
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const url = new URL(req.url);
-    const requestedUserId = url.searchParams.get("userId");
-    
+    const requestedUserId = url.searchParams.get("userId") || user.id;
+
     // SECURITY: Users can only see their own analytics unless they are admin
     if (requestedUserId !== user.id) {
-        // We'll allow the request to proceed if the user is an admin (checked later or via middleware)
-        // But for standard users, we force their ID
         const { data: credits } = await supabase.from('user_credits').select('tier').eq('user_id', user.id).single();
         if (credits?.tier !== 'admin') {
             return NextResponse.json({ error: "Forbidden: You can only view your own analytics." }, { status: 403 });
@@ -64,8 +58,8 @@ const TrackEventSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const supabaseClient = createClient();
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
