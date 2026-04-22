@@ -2,6 +2,124 @@ import { Groq } from 'groq-sdk';
 import { createClient } from '@supabase/supabase-js';
 import { TIER_LIMITS } from './nexus_prime_constants';
 
+// ─── FREE-FIRST FALLBACK CHAIN ───────────────────────────────────────────────
+// Primary AI completion path: cycles through free/cheap providers before
+// falling back to the class-level Groq SDK instance.
+
+const FALLBACK_PROVIDERS = [
+  {
+    url: "https://opencode.ai/zen/v1/chat/completions",
+    key: process.env.OPENCODE_ZEN_API_KEY!,
+    models: ["minimax-m2.5-free", "nemotron-3-super-free"],
+    name: "zen-free"
+  },
+  {
+    url: "https://api.groq.com/openai/v1/chat/completions",
+    key: process.env.GROQ_API_KEY!,
+    models: ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"],
+    name: "groq"
+  },
+  {
+    url: "https://openrouter.ai/api/v1/chat/completions",
+    key: process.env.OPENROUTER_API_KEY!,
+    models: ["google/gemini-flash-1.5", "anthropic/claude-3-haiku"],
+    name: "openrouter"
+  },
+  {
+    url: "https://generativelanguage.googleapis.com/v1beta/models",
+    key: process.env.GEMINI_API_KEY!,
+    models: ["gemini-1.5-flash"],
+    name: "gemini"
+  }
+];
+
+interface AIOptions {
+  temperature?: number
+  max_tokens?: number
+}
+
+export async function aiComplete(
+  messages: { role: string; content: string }[],
+  options?: AIOptions
+): Promise<string> {
+  for (const provider of FALLBACK_PROVIDERS) {
+    if (!provider.key) continue
+
+    for (const model of provider.models) {
+      try {
+        const res = await fetch(provider.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${provider.key}`
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: options?.temperature ?? 0.7,
+            max_tokens: options?.max_tokens ?? 2048
+          }),
+          signal: AbortSignal.timeout(15000)
+        })
+
+        if (!res.ok) {
+          console.warn(`[${provider.name}/${model}] failed: ${res.status}`)
+          continue
+        }
+
+        const data = await res.json()
+        return data.choices?.[0]?.message?.content ?? ""
+      } catch (err) {
+        console.warn(`[${provider.name}/${model}] error:`, err)
+        continue
+      }
+    }
+  }
+
+  throw new Error("All AI providers failed")
+}
+
+export async function aiCompleteStream(
+  messages: { role: string; content: string }[],
+  options?: AIOptions
+): Promise<ReadableStream> {
+  for (const provider of FALLBACK_PROVIDERS) {
+    if (!provider.key) continue
+
+    for (const model of provider.models) {
+      try {
+        const res = await fetch(provider.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${provider.key}`
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: options?.temperature ?? 0.7,
+            max_tokens: options?.max_tokens ?? 2048,
+            stream: true
+          }),
+          signal: AbortSignal.timeout(15000)
+        })
+
+        if (!res.ok) continue
+        if (!res.body) continue
+
+        return res.body
+      } catch (err) {
+        console.warn(`[${provider.name}/${model}] stream error:`, err)
+        continue
+      }
+    }
+  }
+
+  throw new Error("All AI providers failed")
+}
+
+// ─── AGENT CONFIG & PROMPTS ──────────────────────────────────────────────────
+
 export interface AgentConfig {
   groqKey: string;
   openRouterKey: string;
@@ -254,7 +372,6 @@ Return ONLY a JSON array of optimization objects:
 ]
 `.trim();
 
-
 const MARKETING_PSY_SYSTEM_PROMPT = `
 You are the NEXUS PRIME Marketing Psychology Agent. Your goal is to optimize the UI for conversion, engagement, and user retention.
 Use principles like:
@@ -335,6 +452,8 @@ OUTPUT FORMAT:
 Return ONLY the raw JSON object. No conversational filler.
 `.trim();
 
+// ─── ORCHESTRATOR CLASS ──────────────────────────────────────────────────────
+
 export class NexusOrchestrator {
   private groq: Groq;
   private supabase: any;
@@ -346,6 +465,27 @@ export class NexusOrchestrator {
     this.supabase = createClient(config.supabaseUrl, config.supabaseKey);
     this.openRouterKey = config.openRouterKey;
     this.googleAIKey = config.googleAIKey;
+  }
+
+  /**
+   * Primary AI completion: free-first fallback chain → Groq SDK last resort.
+   * Replaces direct callGroq for all agent steps.
+   */
+  private async callAI(messages: { role: string; content: string }[], fallbackModel = 'llama-3.3-70b-versatile'): Promise<string> {
+    try {
+      return await aiComplete(messages);
+    } catch {
+      // All fetch-based providers failed — last resort: Groq SDK
+      return this.callGroqSDK(fallbackModel, messages);
+    }
+  }
+
+  /**
+   * Last-resort Groq SDK call (kept as fallback only).
+   */
+  private async callGroqSDK(model: string, messages: any[]) {
+    const response = await this.groq.chat.completions.create({ model, messages });
+    return response.choices[0]?.message?.content || '';
   }
 
   /**
@@ -396,26 +536,24 @@ export class NexusOrchestrator {
         await this.logEvent(jobId, 'gemini-2.0-flash', 'completion', visualAnalysis);
       }
 
-      // STEP 1: REASONING (Qwen3-32B or Llama-70B for priority)
-      const reasoningModel = isPriority ? 'llama-3.3-70b-versatile' : 'qwen/qwen3-32b';
-      await this.logEvent(jobId, reasoningModel, 'thought', `Initializing deep reasoning (${isPriority ? 'High Compute' : 'Standard'})...`);
-      const reasoning = await this.callGroq(reasoningModel, [
+      // STEP 1: REASONING (free-first chain, Groq SDK fallback)
+      await this.logEvent(jobId, 'reasoner', 'thought', 'Initializing deep reasoning...');
+      const reasoning = await this.callAI([
         { role: 'system', content: 'You are the Reasoner. Break down the user prompt and visual analysis into a logical architecture.' },
         { role: 'user', content: `Prompt: ${job.prompt}\nVisual Analysis: ${visualAnalysis}` }
-      ]);
-      await this.logEvent(jobId, reasoningModel, 'completion', reasoning);
+      ], isPriority ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant');
+      await this.logEvent(jobId, 'reasoner', 'completion', reasoning);
 
-      // STEP 2: ORCHESTRATION (Llama-70B)
-      await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'thought', 'Generating execution plan based on reasoning...');
-      const plan = await this.callGroq('llama-3.3-70b-versatile', [
+      // STEP 2: ORCHESTRATION
+      await this.logEvent(jobId, 'orchestrator', 'thought', 'Generating execution plan based on reasoning...');
+      const plan = await this.callAI([
         { role: 'system', content: 'You are the Orchestrator. Create a task list for the Coder agent.' },
         { role: 'user', content: `Reasoning: ${reasoning}\nPrompt: ${job.prompt}` }
       ]);
-      await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'completion', plan);
+      await this.logEvent(jobId, 'orchestrator', 'completion', plan);
 
-      // STEP 3: CODING (Llama-8B or Llama-70B for priority) - MULTI-FILE JSON
-      const codingModel = isPriority ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant';
-      await this.logEvent(jobId, codingModel, 'thought', `Writing multi-file code structure (${isPriority ? 'Ultra Quality' : 'Instant'})...`);
+      // STEP 3: CODING - MULTI-FILE JSON
+      await this.logEvent(jobId, 'coder', 'thought', 'Writing multi-file code structure...');
       
       let systemPrompt = CODER_SYSTEM_PROMPT;
       
@@ -446,10 +584,10 @@ export class NexusOrchestrator {
         systemPrompt = `${systemPrompt}${whiteLabelInstructions}`;
       }
 
-      const coderResponse = await this.callGroq(codingModel, [
+      const coderResponse = await this.callAI([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Plan: ${plan}` }
-      ]);
+      ], isPriority ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant');
       
       let initialCode;
       try {
@@ -462,11 +600,11 @@ export class NexusOrchestrator {
       } catch (e) {
         initialCode = { files: [{ path: "app/page.tsx", content: coderResponse.replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*/g, '').replace(/```/g, '')).trim() }] };
       }
-      await this.logEvent(jobId, 'llama-3.1-8b-instant', 'completion', `Generated ${initialCode.files?.length || 1} files`);
+      await this.logEvent(jobId, 'coder', 'completion', `Generated ${initialCode.files?.length || 1} files`);
 
-      // STEP 4: LINTING (Llama-70B) - QUALITY ASSURANCE
-      await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'thought', 'Reviewing code for syntax and type safety...');
-      const linterResponse = await this.callGroq('llama-3.3-70b-versatile', [
+      // STEP 4: LINTING - QUALITY ASSURANCE
+      await this.logEvent(jobId, 'linter', 'thought', 'Reviewing code for syntax and type safety...');
+      const linterResponse = await this.callAI([
         { role: 'system', content: LINTER_SYSTEM_PROMPT },
         { role: 'user', content: `Initial Code: ${JSON.stringify(initialCode)}\nPlan: ${plan}` }
       ]);
@@ -480,9 +618,9 @@ export class NexusOrchestrator {
           finalCode = initialCode;
         }
       } catch (e) {
-        finalCode = initialCode; // Fallback to initial code if linter fails
+        finalCode = initialCode;
       }
-      await this.logEvent(jobId, 'llama-3.3-70b-versatile', 'completion', 'Quality assurance complete. Code is ready.');
+      await this.logEvent(jobId, 'linter', 'completion', 'Quality assurance complete. Code is ready.');
 
       // FINAL: COMPLETE
       await this.supabase.from('agent_jobs').update({
@@ -490,7 +628,7 @@ export class NexusOrchestrator {
         result: { reasoning, plan, code: finalCode, visualAnalysis }
       }).eq('id', jobId);
 
-      // Point 3: Auto-sync AI-generated code into project files
+      // Auto-sync AI-generated code into project files
       if (job.project_id && finalCode?.files) {
         for (const file of finalCode.files) {
           const ext = file.path.split(".").pop()?.toLowerCase();
@@ -522,7 +660,6 @@ export class NexusOrchestrator {
       throw new Error('Google AI Key is missing. Vision features are disabled.');
     }
     try {
-      // Defensive check for image data format
       if (!imageUrl || (!imageUrl.startsWith('data:image/') && imageUrl.length < 50)) {
         throw new Error('Invalid image format. Expected a base64 data URL.');
       }
@@ -545,17 +682,7 @@ export class NexusOrchestrator {
       if (data.error) throw new Error(data.error.message || 'Gemini Vision API Error');
       return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Vision analysis returned empty result.';
     } catch (e: any) {
-      // PROD FIX: Removed console.error for production
       throw new Error(`Vision Analysis Failed: ${e.message}`);
-    }
-  }
-
-  private async callGroq(model: string, messages: any[]) {
-    try {
-      const response = await this.groq.chat.completions.create({ model, messages });
-      return response.choices[0]?.message?.content || '';
-    } catch (e) {
-      throw e;
     }
   }
 
@@ -576,7 +703,7 @@ export class NexusOrchestrator {
    * Shield-Mode: Perform Security Audit
    */
   async performSecurityAudit(files: { path: string, content: string }[]) {
-    const auditResponse = await this.callGroq('llama-3.3-70b-versatile', [
+    const auditResponse = await this.callAI([
       { role: 'system', content: SHIELD_MODE_SYSTEM_PROMPT },
       { role: 'user', content: `Audit the following project files:\n${JSON.stringify(files)}` }
     ]);
@@ -585,7 +712,6 @@ export class NexusOrchestrator {
       const jsonMatch = auditResponse.match(/\[[\s\S]*\]/);
       return JSON.parse(jsonMatch ? jsonMatch[0] : auditResponse);
     } catch (e) {
-      // PROD FIX: Removed console.error for production
       return [];
     }
   }
@@ -594,7 +720,7 @@ export class NexusOrchestrator {
    * Shield-Mode: Fix Security Vulnerability
    */
   async fixSecurityVulnerability(file: { path: string, content: string }, vulnerability: any) {
-    const fixResponse = await this.callGroq('llama-3.3-70b-versatile', [
+    const fixResponse = await this.callAI([
       { role: 'system', content: 'You are the NEXUS PRIME Security Fixer. Apply the recommended fix to the provided code while maintaining functionality.' },
       { role: 'user', content: `File: ${file.path}\nContent: ${file.content}\nVulnerability: ${vulnerability.title}\nRecommendation: ${vulnerability.recommendation}\n\nReturn the ENTIRE updated file content only. No markdown.` }
     ]);
@@ -606,7 +732,7 @@ export class NexusOrchestrator {
    * AI Test Generation
    */
   async generateTests(files: { path: string, content: string }[]) {
-    const response = await this.callGroq('llama-3.3-70b-versatile', [
+    const response = await this.callAI([
       { role: 'system', content: TEST_GENERATOR_SYSTEM_PROMPT },
       { role: 'user', content: `Generate tests for these files:\n${JSON.stringify(files)}` }
     ]);
@@ -616,7 +742,6 @@ export class NexusOrchestrator {
       const data = JSON.parse(jsonMatch ? jsonMatch[0] : response);
       return data.files || [];
     } catch (e) {
-      // PROD FIX: Removed console.error for production
       return [];
     }
   }
@@ -632,7 +757,7 @@ export class NexusOrchestrator {
    * AI Deployment Health Analysis
    */
   async analyzeDeploymentHealth(logs: string) {
-    const response = await this.callGroq('llama-3.3-70b-versatile', [
+    const response = await this.callAI([
       { role: 'system', content: DEPLOYMENT_MONITOR_SYSTEM_PROMPT },
       { role: 'user', content: `Analyze these deployment logs:\n${logs}` }
     ]);
@@ -641,7 +766,6 @@ export class NexusOrchestrator {
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       return JSON.parse(jsonMatch ? jsonMatch[0] : response);
     } catch (e) {
-      // PROD FIX: Removed console.error for production
       return { status: 'error', summary: 'Failed to analyze logs.' };
     }
   }
@@ -650,7 +774,7 @@ export class NexusOrchestrator {
    * AI Component Prop Parsing
    */
   async parseComponentProps(fileContent: string) {
-    const response = await this.callGroq('llama-3.3-70b-versatile', [
+    const response = await this.callAI([
       { role: 'system', content: COMPONENT_PARSER_SYSTEM_PROMPT },
       { role: 'user', content: `Extract props from this component:\n${fileContent}` }
     ]);
@@ -659,18 +783,16 @@ export class NexusOrchestrator {
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       return JSON.parse(jsonMatch ? jsonMatch[0] : response);
     } catch (e) {
-      // PROD FIX: Removed console.error for production
       return { props: [] };
     }
   }
 
   /**
    * One-Click Deployment to Vercel
-   * Creates a Vercel deployment from the generated files JSON.
    */
   async deployToVercel(files: { path: string, content: string }[], projectName: string) {
     const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
-    const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID; // Optional
+    const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
 
     if (!VERCEL_TOKEN) throw new Error("VERCEL_TOKEN is not configured.");
 
@@ -679,7 +801,6 @@ export class NexusOrchestrator {
       data: f.content,
     }));
 
-    // ENSURE PACKAGE.JSON EXISTS FOR VERCEL BUILD
     if (!files.some(f => f.path === 'package.json')) {
       deploymentFiles.push({
         file: 'package.json',
@@ -707,7 +828,6 @@ export class NexusOrchestrator {
       });
     }
 
-    // ENSURE TSCONFIG.JSON EXISTS
     if (!files.some(f => f.path === 'tsconfig.json')) {
       deploymentFiles.push({
         file: 'tsconfig.json',
@@ -759,7 +879,6 @@ export class NexusOrchestrator {
         deploymentId: data.id,
       };
     } catch (e: any) {
-      // PROD FIX: Removed console.error for production
       throw e;
     }
   }
@@ -768,7 +887,6 @@ export class NexusOrchestrator {
    * Heal a failed deployment using AI analysis
    */
   async healDeployment(deploymentId: string) {
-    // 1. Fetch deployment details
     const { data: deploy, error: deployError } = await this.supabase
       .from('deployments')
       .select('*')
@@ -778,7 +896,6 @@ export class NexusOrchestrator {
     if (deployError || !deploy) throw new Error("Deployment not found");
     if (deploy.status !== 'failed') throw new Error("Only failed deployments can be healed.");
 
-    // 2. Fetch project files
     const { data: files } = await this.supabase
       .from('project_files')
       .select('path, content')
@@ -786,20 +903,17 @@ export class NexusOrchestrator {
 
     if (!files || files.length === 0) throw new Error("No files found for this project.");
 
-    // 3. Call DevOps Agent
     const errorLog = deploy.build_log || deploy.error_message || "Unknown build error";
     
-    // We only send the relevant error context and files to save tokens
-    // In a real scenario, we might filter files based on the error log mentions
     const prompt = `
 Build Log:
 ${errorLog}
 
 Current Files:
-${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
+${JSON.stringify(files.slice(0, 20))}
     `;
 
-    const response = await this.callGroq('llama-3.3-70b-versatile', [
+    const response = await this.callAI([
       { role: 'system', content: DEVOPS_SYSTEM_PROMPT },
       { role: 'user', content: prompt }
     ]);
@@ -809,7 +923,6 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
       const jsonString = jsonMatch ? jsonMatch[0] : response;
       return JSON.parse(jsonString);
     } catch (e) {
-      // PROD FIX: Removed console.error for production
       throw new Error("AI failed to produce a structured fix. Please check the logs manually.");
     }
   }
@@ -818,12 +931,11 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
    * Import Figma nodes and convert them to React components
    */
   async importFromFigma(figmaData: any) {
-    // Process multiple nodes if provided
     const nodes = Array.isArray(figmaData.nodes) ? figmaData.nodes : [figmaData.node];
     const results = [];
 
     for (const node of nodes) {
-      const response = await this.callGroq('llama-3.3-70b-versatile', [
+      const response = await this.callAI([
         { role: 'system', content: FIGMA_SYSTEM_PROMPT },
         { role: 'user', content: `Figma Node Data: ${JSON.stringify(node)}` }
       ]);
@@ -834,7 +946,7 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
         const result = JSON.parse(jsonString);
         results.push(...result.files);
       } catch (e) {
-        // PROD FIX: Removed console.error for production
+        // skip malformed node
       }
     }
 
@@ -847,27 +959,24 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
   async conductWarRoomDebate(jobId: string, userPrompt: string) {
     const debate: any[] = [];
 
-    // 1. Architect's Perspective
     await this.logEvent(jobId, 'Architect', 'thought', 'Designing system architecture...');
-    const architectResponse = await this.callGroq('llama-3.3-70b-versatile', [
+    const architectResponse = await this.callAI([
       { role: 'system', content: ARCHITECT_SYSTEM_PROMPT },
       { role: 'user', content: `Design a high-level architecture for this request: ${userPrompt}` }
     ]);
     debate.push({ agent: 'Architect', content: architectResponse });
     await this.logEvent(jobId, 'Architect', 'completion', architectResponse);
 
-    // 2. UI/UX Designer's Perspective (Contextualized)
     await this.logEvent(jobId, 'UI/UX Designer', 'thought', 'Refining user interface and flow...');
-    const uiDesignerResponse = await this.callGroq('llama-3.3-70b-versatile', [
+    const uiDesignerResponse = await this.callAI([
       { role: 'system', content: UI_DESIGNER_SYSTEM_PROMPT },
       { role: 'user', content: `User Request: ${userPrompt}\n\nArchitect's Proposal: ${architectResponse}\n\nHow should we design the UI to match this architecture?` }
     ]);
     debate.push({ agent: 'UI/UX Designer', content: uiDesignerResponse });
     await this.logEvent(jobId, 'UI/UX Designer', 'completion', uiDesignerResponse);
 
-    // 3. Security Analyst's Perspective
     await this.logEvent(jobId, 'Security Analyst', 'thought', 'Auditing the proposal for vulnerabilities...');
-    const securityResponse = await this.callGroq('llama-3.3-70b-versatile', [
+    const securityResponse = await this.callAI([
       { role: 'system', content: SECURITY_ANALYST_PROMPT },
       { role: 'user', content: `User Request: ${userPrompt}\n\nArchitect's Proposal: ${architectResponse}\n\nUI Proposal: ${uiDesignerResponse}\n\nIdentify potential security risks.` }
     ]);
@@ -882,7 +991,7 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
    */
   async generateDatabaseSchema(jobId: string, userPrompt: string) {
     await this.logEvent(jobId, 'Database Architect', 'thought', 'Designing database schema and CRUD actions...');
-    const response = await this.callGroq('llama-3.3-70b-versatile', [
+    const response = await this.callAI([
       { role: 'system', content: DB_ARCHITECT_SYSTEM_PROMPT },
       { role: 'user', content: `Requirement: ${userPrompt}` }
     ]);
@@ -895,7 +1004,6 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
       await this.logEvent(jobId, 'Database Architect', 'completion', `Generated schema with ${result.files?.length || 0} files.`);
       return result;
     } catch (e) {
-      // PROD FIX: Removed console.error for production
       throw new Error("AI failed to produce a structured database design.");
     }
   }
@@ -904,7 +1012,6 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
    * Generate project documentation and component lab data
    */
   async generateDocumentation(jobId: string, projectId: string) {
-    // 1. Fetch project files
     const { data: files } = await this.supabase
       .from('project_files')
       .select('path, content')
@@ -914,11 +1021,10 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
 
     await this.logEvent(jobId, 'Documentation Agent', 'thought', 'Analyzing project structure for documentation...');
     
-    // We send a summary of files and some sample content to save tokens
     const fileSummary = files.map((f: any) => f.path).join('\n');
     const sampleContent = files.slice(0, 15).map((f: any) => `FILE: ${f.path}\n${f.content.slice(0, 2000)}`).join('\n---\n');
 
-    const response = await this.callGroq('llama-3.3-70b-versatile', [
+    const response = await this.callAI([
       { role: 'system', content: DOCUMENTATION_SYSTEM_PROMPT },
       { role: 'user', content: `Project Structure:\n${fileSummary}\n\nSample Content:\n${sampleContent}` }
     ]);
@@ -931,7 +1037,6 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
       await this.logEvent(jobId, 'Documentation Agent', 'completion', `Generated ${result.files?.length || 0} docs and ${result.components?.length || 0} component specs.`);
       return result;
     } catch (e) {
-      // PROD FIX: Removed console.error for production
       throw new Error("AI failed to produce structured documentation.");
     }
   }
@@ -942,12 +1047,11 @@ ${JSON.stringify(files.slice(0, 20))} // Limiting for context window safety
   async applyVoiceEdit(jobId: string, fileContent: string, voiceCommand: string) {
     await this.logEvent(jobId, 'Voice Editor', 'thought', `Interpreting voice command: "${voiceCommand}"`);
     
-    const response = await this.callGroq('llama-3.3-70b-versatile', [
+    const response = await this.callAI([
       { role: 'system', content: VOICE_EDITOR_SYSTEM_PROMPT },
       { role: 'user', content: `Current File Code:\n${fileContent}\n\nVoice Command: "${voiceCommand}"` }
     ]);
 
-    // Clean markdown blocks if LLM disobeyed
     const cleanedCode = response.replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*/g, '').replace(/```/g, '')).trim();
     
     await this.logEvent(jobId, 'Voice Editor', 'completion', `Modified ${cleanedCode.length} characters of code.`);
