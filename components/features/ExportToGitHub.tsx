@@ -133,7 +133,9 @@ export default function ExportToGitHub({ projectId, projectName }: ExportToGitHu
           <div style={{ textAlign: "center", padding: "60px" }}>
             <div style={{ fontSize: "36px", marginBottom: "12px" }}>🔗</div>
             <p>Connect your GitHub account to export</p>
-            <button style={{
+            <button onClick={() => {
+              window.open("https://github.com/login/oauth/authorize", "_blank");
+            }} style={{
               padding: "10px 20px", borderRadius: "8px", border: "none",
               background: "#171717", color: "#e5e5e5", cursor: "pointer", fontSize: "14px",
               marginTop: "12px",

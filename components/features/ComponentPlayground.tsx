@@ -174,7 +174,15 @@ export default function App() {
         </div>
 
         <div className="p-4 border-t border-white/10 bg-black/40">
-          <button className="w-full py-2 bg-white text-black text-[10px] font-bold uppercase tracking-widest hover:bg-[#00ff88] transition-all flex items-center justify-center gap-2">
+          <button onClick={() => {
+            const blob = new Blob([JSON.stringify({ component: componentPath, props: currentProps }, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${componentPath || "component"}-module.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }} className="w-full py-2 bg-white text-black text-[10px] font-bold uppercase tracking-widest hover:bg-[#00ff88] transition-all flex items-center justify-center gap-2">
             <Download className="w-3 h-3" /> Export Module
           </button>
         </div>

@@ -597,6 +597,16 @@ export default function TeamWorkspace({ userId }: TeamWorkspaceProps) {
                         Deleting this team will remove all shared projects and members.
                       </p>
                       <button
+                        onClick={async () => {
+                          if (!confirm("Are you sure? This will permanently delete the team and all shared projects.")) return;
+                          try {
+                            const res = await fetch(`/api/teams/${activeTeam!.id}`, { method: "DELETE" });
+                            if (res.ok) {
+                              setTeams((prev: any[]) => prev.filter((t: any) => t.id !== activeTeam!.id));
+                              setActiveTeam(null);
+                            }
+                          } catch (err) { console.error(err); }
+                        }}
                         style={{
                           padding: "8px 16px", borderRadius: "8px",
                           border: "1px solid #ef4444", background: "transparent",
