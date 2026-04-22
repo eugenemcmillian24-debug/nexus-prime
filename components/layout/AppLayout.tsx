@@ -132,12 +132,20 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
   const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab" | "war-room" | "security" | "tests" | "performance">("none");
   const [currentVersion, setCurrentVersion] = useState(initialVersion);
   const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/auth/login";
+  };
 
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const admin = checkIsAdmin(session?.user || null);
       setIsAdmin(admin);
+      setUserEmail(session?.user?.email || null);
       
       if (session?.user) {
         const { data } = await supabase.from('user_credits').select('*').eq('user_id', session.user.id).single();
@@ -642,6 +650,89 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
               <span style={{ fontSize: "10px", fontWeight: 900, color: "#00ff88", textTransform: "uppercase" }}>
                 {credits?.balance || 0} CR
               </span>
+            </div>
+
+            {/* Account Menu */}
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowAccountMenu(!showAccountMenu)}
+                style={{
+                  height: "32px", borderRadius: "8px", padding: "0 10px",
+                  border: "1px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.02)",
+                  color: "#a3a3a3", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+                  transition: "all 0.2s", fontSize: "11px", fontWeight: 700,
+                }}
+              >
+                <div style={{
+                  width: "20px", height: "20px", borderRadius: "50%",
+                  background: "linear-gradient(135deg, #00ff88, #00cc6d)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#000", fontSize: "10px", fontWeight: 900,
+                }}>
+                  {(userEmail || "U")[0].toUpperCase()}
+                </div>
+                ▾
+              </button>
+              {showAccountMenu && (
+                <>
+                  <div onClick={() => setShowAccountMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
+                  <div style={{
+                    position: "absolute", right: 0, top: "40px", zIndex: 200,
+                    background: "#141414", border: "1px solid #262626", borderRadius: "12px",
+                    padding: "8px 0", minWidth: "220px",
+                    boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+                  }}>
+                    <div style={{ padding: "12px 16px", borderBottom: "1px solid #262626" }}>
+                      <div style={{ fontSize: "10px", fontWeight: 900, color: "#444", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>
+                        Account
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#e5e5e5", fontWeight: 600, wordBreak: "break-all" }}>
+                        {userEmail || "—"}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#00ff88", fontWeight: 700, textTransform: "uppercase", marginTop: "4px" }}>
+                        {credits?.tier || "Free"} • {isAdmin ? "Admin" : "User"}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setActiveView("settings"); setShowAccountMenu(false); }}
+                      style={{
+                        width: "100%", padding: "10px 16px", background: "transparent", border: "none",
+                        color: "#a3a3a3", fontSize: "11px", fontWeight: 600, textAlign: "left", cursor: "pointer",
+                        display: "flex", alignItems: "center", gap: "8px",
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
+                      onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      ⚙️ Settings
+                    </button>
+                    <button
+                      onClick={() => { setActiveView("billing"); setShowAccountMenu(false); }}
+                      style={{
+                        width: "100%", padding: "10px 16px", background: "transparent", border: "none",
+                        color: "#a3a3a3", fontSize: "11px", fontWeight: 600, textAlign: "left", cursor: "pointer",
+                        display: "flex", alignItems: "center", gap: "8px",
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
+                      onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      💰 Credits & Billing
+                    </button>
+                    <div style={{ borderTop: "1px solid #262626", margin: "4px 0" }} />
+                    <button
+                      onClick={handleSignOut}
+                      style={{
+                        width: "100%", padding: "10px 16px", background: "transparent", border: "none",
+                        color: "#ef4444", fontSize: "11px", fontWeight: 700, textAlign: "left", cursor: "pointer",
+                        display: "flex", alignItems: "center", gap: "8px", textTransform: "uppercase", letterSpacing: "0.05em",
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = "rgba(239,68,68,0.05)")}
+                      onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      🚪 Sign Out
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
             
             <button
