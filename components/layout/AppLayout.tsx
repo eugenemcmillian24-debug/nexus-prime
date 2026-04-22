@@ -6,13 +6,10 @@ import Link from "next/link";
 import { checkIsAdmin } from "@/lib/access_client";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = (() => {
-  if (typeof window === 'undefined') return null as any;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null as any;
-  return createClient(url, key);
-})();
+const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder"
+) : null as any;
 
 // Lazy-load all feature components for code splitting
 const PromptTemplates = dynamic(() => import("@/components/features/PromptTemplates"), { ssr: false });
@@ -622,7 +619,7 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
         <header style={{
           height: "64px", borderBottom: "1px solid rgba(255,255,255,0.05)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "0 24px", flexShrink: 0,
+          padding: isMobile ? "0 12px" : "0 24px", flexShrink: 0,
           background: "rgba(10,10,10,0.5)", backdropFilter: "blur(10px)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -634,11 +631,11 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
                 ☰
               </button>
             )}
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ fontSize: "10px", fontWeight: 900, color: "#444", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <div style={{ fontSize: "10px", fontWeight: 900, color: "#444", letterSpacing: "0.1em", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: isMobile ? "120px" : "none" }}>
                 {projectName}
               </div>
-              <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff", textTransform: "uppercase" }}>
+              <div style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, color: "#fff", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: isMobile ? "120px" : "none" }}>
                 {NAV_ITEMS.find((n) => n.id === activeView)?.label || activeView}
               </div>
             </div>
@@ -680,9 +677,9 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
                 <>
                   <div onClick={() => setShowAccountMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
                   <div style={{
-                    position: "absolute", right: 0, top: "40px", zIndex: 200,
+                    position: "absolute", right: isMobile ? "-12px" : 0, top: "40px", zIndex: 200,
                     background: "#141414", border: "1px solid #262626", borderRadius: "12px",
-                    padding: "8px 0", minWidth: "220px",
+                    padding: "8px 0", minWidth: isMobile ? "200px" : "220px", maxWidth: "calc(100vw - 24px)",
                     boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
                   }}>
                     <div style={{ padding: "12px 16px", borderBottom: "1px solid #262626" }}>
@@ -738,17 +735,19 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
               )}
             </div>
             
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              style={{
-                width: "32px", height: "32px", borderRadius: "8px",
-                border: "1px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.02)",
-                color: "#525252", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.2s"
-              }}
-            >
-              {sidebarCollapsed ? "»" : "«"}
-            </button>
+            {!isMobile && (
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                style={{
+                  width: "32px", height: "32px", borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.02)",
+                  color: "#525252", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.2s"
+                }}
+              >
+                {sidebarCollapsed ? "»" : "«"}
+              </button>
+            )}
           </div>
         </header>
 

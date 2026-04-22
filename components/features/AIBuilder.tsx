@@ -95,17 +95,17 @@ export default function AIBuilder({ userId, isAdmin, credits }: { userId: string
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-16 animate-in fade-in duration-700 relative z-10">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 md:space-y-16 animate-in fade-in duration-700 relative z-10">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <div className="w-2 h-8 bg-[#00ff88] rounded-full shadow-[0_0_15px_rgba(0,255,136,0.5)]" />
-            <h2 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">Autonomous Forge</h2>
+            <h2 className="text-2xl md:text-4xl font-black text-white tracking-tighter uppercase leading-none">Autonomous Forge</h2>
           </div>
           <p className="text-[#525252] text-[10px] uppercase tracking-[0.4em] font-bold pl-5">Nexus Prime Orchestration Layer // Active</p>
         </div>
         
-        <div className="flex items-center gap-6 border-l border-white/5 pl-6 h-12">
+        <div className="flex items-center gap-4 md:gap-6 border-l border-white/5 pl-4 md:pl-6 h-12 shrink-0">
           <div className="text-right">
             <div className="text-[9px] font-bold text-[#444] uppercase tracking-widest">Active Credits</div>
             <div className="text-xl font-black text-[#00ff88] tracking-tighter">{credits?.balance || 0}</div>
@@ -124,7 +124,7 @@ export default function AIBuilder({ userId, isAdmin, credits }: { userId: string
             <Icons.Layers size={14} className="text-[#444]" />
             <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Seed Blueprints</span>
           </div>
-          <div className="flex gap-1 bg-white/[0.02] p-1 rounded-xl border border-white/5">
+          <div className="flex gap-1 bg-white/[0.02] p-1 rounded-xl border border-white/5 overflow-x-auto max-w-[60vw] md:max-w-none">
             {TEMPLATE_CATEGORIES.map(cat => (
               <button
                 key={cat.id}
@@ -136,7 +136,7 @@ export default function AIBuilder({ userId, isAdmin, credits }: { userId: string
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
           {filteredTemplates.map((template) => {
             const Icon = (Icons as any)[template.icon] || Icons.FileCode;
             const isSelected = prompt === template.prompt;
@@ -170,7 +170,7 @@ export default function AIBuilder({ userId, isAdmin, credits }: { userId: string
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="ENTER APPLICATION PROTOCOL OR SYSTEM DESCRIPTION..."
-              className="w-full h-72 bg-white/[0.02] border border-white/5 rounded-[32px] p-10 text-white text-lg font-medium outline-none focus:border-[#00ff8833] focus:bg-white/[0.04] transition-all resize-none shadow-2xl placeholder:text-[#222]"
+              className="w-full h-48 md:h-72 bg-white/[0.02] border border-white/5 rounded-[32px] p-10 text-white text-lg font-medium outline-none focus:border-[#00ff8833] focus:bg-white/[0.04] transition-all resize-none shadow-2xl placeholder:text-[#222]"
             />
             
             {/* Visual indicator for focus */}
