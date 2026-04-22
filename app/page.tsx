@@ -12,17 +12,21 @@ import LandingPage from "@/components/LandingPage";
 import AgentTrainingLab from "@/components/features/AgentTrainingLab";
 import AgencyWhiteLabelSettings from "@/components/features/AgencyWhiteLabelSettings";
 import AppLayout from "@/components/layout/AppLayout";
-import { createClient, User, AuthChangeEvent, Session, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
+import { createClient, type User, type AuthChangeEvent, type Session, type RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { NEXUS_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/templates";
 import * as Icons from "lucide-react";
 import Link from "next/link";
 import { checkIsAdmin } from "@/lib/access_client";
 import { PREMIUM_AGENTS } from "@/lib/nexus_prime_constants";
 
-const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-) : null as any; // PROD FIX: Removed placeholders
+const supabase = (() => {
+  if (typeof window === 'undefined') return null as any;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null as any;
+  return createClient(url, key);
+})();
 
 export default function Page() {
   const [user, setUser] = useState<User | null>(null);

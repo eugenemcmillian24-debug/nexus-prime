@@ -6,10 +6,13 @@ import Link from "next/link";
 import { checkIsAdmin } from "@/lib/access_client";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder"
-) : null as any;
+const supabase = (() => {
+  if (typeof window === 'undefined') return null as any;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null as any;
+  return createClient(url, key);
+})();
 
 // Lazy-load all feature components for code splitting
 const PromptTemplates = dynamic(() => import("@/components/features/PromptTemplates"), { ssr: false });
