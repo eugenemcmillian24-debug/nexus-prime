@@ -9,3 +9,21 @@ dist
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+
+# Jupyter / IPython
+*.ipynb
+*.ipynb_checkpoints/
+.ipynb_checkpoints/
+*.session.dill
+
+# Python build artifacts
+__pycache__/
+*.pyc
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# TypeScript build info
+*.tsbuildinfo

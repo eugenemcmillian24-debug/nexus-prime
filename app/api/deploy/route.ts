@@ -3,9 +3,11 @@ import { createClient } from '@/lib/supabase/api';
 import { NexusOrchestrator } from '@/lib/ai';
 import { z, ZodError } from 'zod';
 
+// userId is intentionally NOT part of the schema — the route always uses the
+// authenticated user's id from the session, and trusting a client-supplied
+// userId here would be a confused-deputy vulnerability.
 const DeploySchema = z.object({
   jobId: z.string().uuid('Invalid job ID format'),
-  userId: z.string().uuid('Invalid user ID format'),
   projectName: z.string().min(1).max(100).optional(),
 });
 
@@ -18,9 +20,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    // 1. INPUT VALIDATION (Zod Hardening)
-    // We ensure the userId used is the authenticated one
-    const { jobId, projectName } = DeploySchema.parse({ ...body, userId: user.id });
+    const { jobId, projectName } = DeploySchema.parse(body);
 
     // 2. Fetch Job Result
     const { data: job, error: jobError } = await supabase
