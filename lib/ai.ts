@@ -16,18 +16,24 @@ const FALLBACK_PROVIDERS = [
   {
     url: "https://api.groq.com/openai/v1/chat/completions",
     key: process.env.GROQ_API_KEY!,
-    models: ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"],
+    // mixtral-8x7b-32768 was deprecated by Groq; replaced with
+    // llama-3.1-8b-instant as the fast fallback tier.
+    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
     name: "groq"
   },
   {
     url: "https://openrouter.ai/api/v1/chat/completions",
     key: process.env.OPENROUTER_API_KEY!,
-    models: ["google/gemini-flash-1.5", "anthropic/claude-3-haiku"],
+    // claude-3-haiku was retired on OpenRouter; use the 3.5 haiku slug.
+    models: ["google/gemini-flash-1.5", "anthropic/claude-3-5-haiku"],
     name: "openrouter"
   },
   {
     url: "https://generativelanguage.googleapis.com/v1beta/models",
-    key: process.env.GEMINI_API_KEY!,
+    // GOOGLE_AI_KEY is the canonical env var used by every other route in
+    // this repo (search for "googleAIKey"). GEMINI_API_KEY is accepted as
+    // a legacy fallback for older deployments.
+    key: (process.env.GOOGLE_AI_KEY ?? process.env.GEMINI_API_KEY)!,
     models: ["gemini-1.5-flash"],
     name: "gemini"
   }
