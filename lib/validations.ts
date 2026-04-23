@@ -13,12 +13,20 @@ export const AgentJobSchema = z.object({
     .nullable(),
 });
 
-export const CheckoutSchema = z.object({
-  userId: z.string().uuid("Invalid user ID format"),
-  tier: z.enum(["Starter", "PRO", "Enterprise"], {
-    errorMap: () => ({ message: "Invalid subscription tier" }),
+export const CheckoutSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("subscription"),
+    tier: z.enum(["Starter", "PRO", "Enterprise"], {
+      errorMap: () => ({ message: "Invalid subscription tier" }),
+    }),
   }),
-});
+  z.object({
+    type: z.literal("topup"),
+    packId: z.enum(["pack_50", "pack_250", "pack_1000"], {
+      errorMap: () => ({ message: "Invalid top-up pack" }),
+    }),
+  }),
+]);
 
 export const TranscriptionSchema = z.object({
   file: z.instanceof(Blob, { message: "Invalid audio file format" }),
