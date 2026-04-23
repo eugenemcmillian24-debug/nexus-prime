@@ -50,6 +50,34 @@ export default function Login() {
         });
         if (error) throw error;
 
+        // Supabase returns a user with an empty `identities` array when the
+        // email is already registered but not yet confirmed. No new email is
+        // sent for this case, so explicitly trigger a resend and route to the
+        // verify-email screen instead of silently appearing to succeed.
+        const alreadyRegistered =
+          !!data.user &&
+          Array.isArray(data.user.identities) &&
+          data.user.identities.length === 0;
+
+        if (alreadyRegistered) {
+          const { error: resendError } = await supabase.auth.resend({
+            type: "signup",
+            email,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+            },
+          });
+          // Tolerate rate limits — the user may already have a valid code.
+          if (
+            resendError &&
+            !resendError.message.toLowerCase().includes("rate limit")
+          ) {
+            throw resendError;
+          }
+          setStep("verify-email");
+          return;
+        }
+
         // If email confirmation is required, show verify screen
         if (data.user && !data.session) {
           setStep("verify-email");
