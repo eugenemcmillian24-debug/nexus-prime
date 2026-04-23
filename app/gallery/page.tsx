@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 import {
   Heart,
   Eye,
@@ -13,13 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-const supabase = (() => {
-  if (typeof window === 'undefined') return null as any;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null as any;
-  return createClient(url, key);
-})();
+const supabase = typeof window !== 'undefined' ? createClient() : (null as any);
 
 interface PublishedBuild {
   id: string;

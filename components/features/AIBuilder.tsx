@@ -9,12 +9,9 @@ import CodePreview from "@/components/CodePreview";
 import IterativeRefinement from "@/components/IterativeRefinement";
 import ScreenshotUpload from "@/components/ScreenshotUpload";
 import VoiceRecorder from "@/components/VoiceRecorder";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createClient();
 
 export default function AIBuilder({ userId, isAdmin, credits }: { userId: string; isAdmin: boolean; credits: any }) {
   const [prompt, setPrompt] = useState("");

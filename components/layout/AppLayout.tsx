@@ -4,12 +4,9 @@ import React, { useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { checkIsAdmin } from "@/lib/access_client";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 
-const supabase = (typeof window !== 'undefined' || process.env.NEXT_PUBLIC_SUPABASE_URL) ? createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-) : null as any;
+const supabase = createClient();
 
 // Lazy-load all feature components for code splitting
 const PromptTemplates = dynamic(() => import("@/components/features/PromptTemplates"), { ssr: false });
@@ -148,8 +145,17 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
       setUserEmail(session?.user?.email || null);
       
       if (session?.user) {
-        const { data } = await supabase.from('user_credits').select('*').eq('user_id', session.user.id).single();
-        setCredits(data);
+        try {
+          const res = await fetch('/api/user/credits', { credentials: 'include' });
+          if (res.ok) {
+            const body = await res.json();
+            setCredits(body.credits ?? null);
+          } else {
+            setCredits(null);
+          }
+        } catch {
+          setCredits(null);
+        }
       }
     };
     checkUser();

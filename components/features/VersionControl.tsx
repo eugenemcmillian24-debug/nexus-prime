@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 import {
   GitBranch,
   GitCommit,
@@ -20,13 +20,7 @@ import {
   Diff,
 } from "lucide-react";
 
-const supabase =
-  typeof window !== "undefined" || process.env.NEXT_PUBLIC_SUPABASE_URL
-    ? createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-    : (null as any);
+const supabase = createClient();
 
 interface Version {
   id: string;
