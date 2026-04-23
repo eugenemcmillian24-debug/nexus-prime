@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       groqKey: process.env.GROQ_API_KEY!,
       openRouterKey: process.env.OPENROUTER_API_KEY!,
       googleAIKey: process.env.GOOGLE_AI_KEY!,
-      supabaseUrl: process.env.SUPABASE_URL!,
+      supabaseUrl: (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)!,
       supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
     });
 
