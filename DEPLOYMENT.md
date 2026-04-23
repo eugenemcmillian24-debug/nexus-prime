@@ -1,9 +1,30 @@
 # NEXUS PRIME: Deployment Guide
 
 ## 1. Supabase Setup
-Run the following SQL scripts in your Supabase SQL Editor:
-1. `supabase/migrations/001_initial_schema.sql` (Core Tables)
-2. `supabase/migrations/002_all_features.sql` (All Feature Tables)
+
+**Do not paste migrations into the Supabase SQL Editor one at a time.** That
+approach silently allowed `011`, `014`, and `015` to partially apply in
+production, which caused `/api/agent` to return a bare 500 "Internal Server
+Error" on every Build request. Use the Supabase CLI instead — it tracks
+applied migrations in `supabase_migrations.schema_migrations` and is
+idempotent.
+
+```bash
+# 1. Install the Supabase CLI (pick one)
+brew install supabase/tap/supabase                              # macOS
+curl -fsSL https://supabase.com/install.sh | sh                 # Linux
+scoop bucket add supabase https://github.com/supabase/scoop-bucket.git && scoop install supabase  # Windows
+
+# 2. Authenticate and link this repo to the project
+supabase login
+supabase link --project-ref <your-project-ref>
+
+# 3. Apply every migration under supabase/migrations/ that hasn't been applied yet
+supabase db push
+```
+
+See [`supabase/README.md`](supabase/README.md) for the full workflow,
+including authoring new migrations and auditing for schema drift.
 
 ## 2. Environment Variables
 Copy `.env.example` to `.env.local` and fill in all values:

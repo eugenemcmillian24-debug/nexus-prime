@@ -1,0 +1,17 @@
+# Supabase CLI project configuration.
+# Generated so `supabase db push`, `supabase db pull`, and `supabase db diff`
+# work out of the box for this repo. See https://supabase.com/docs/reference/cli/config
+# for the full list of supported keys.
+
+project_id = "nexus-prime"
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.migrations]
+# Schema tracking table used by `supabase db push` to know which migrations
+# have already been applied. This is the piece that was missing in the
+# manual-SQL-Editor workflow that caused partial application of 011/014/015.
+schema = "public"
