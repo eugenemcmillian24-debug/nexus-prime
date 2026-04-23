@@ -1,0 +1,65 @@
+name: supabase-migrate
+
+# Runs `supabase db push` against the linked Supabase project so the
+# /supabase/migrations/*.sql files stay in sync with the live database.
+# Manual-only by design (workflow_dispatch) — the CLI is idempotent but
+# migrations change schema, so we want a human to click the button.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview migrations without applying (uses `supabase db diff`)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify required secrets are set
+        run: |
+          set -e
+          missing=0
+          for var in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Missing required secret: $var"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 1 ]; then
+            echo "Add the missing secrets under Settings → Secrets and variables → Actions → Environment: production"
+            exit 1
+          fi
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Preview pending migrations
+        run: supabase migration list --linked
+
+      - name: Apply migrations (dry run)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        run: supabase db diff --linked --schema public
+
+      - name: Apply migrations
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: supabase db push --linked

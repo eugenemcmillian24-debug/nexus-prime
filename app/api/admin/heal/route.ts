@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
 import { NexusOrchestrator } from '@/lib/ai';
 import { isNexusPrimeAdmin } from '@/lib/nexus_prime_access';
+import { errorResponse } from "@/lib/apiError";
 
 export async function POST(req: Request) {
   try {
@@ -61,7 +62,6 @@ export async function POST(req: Request) {
       filesFixed: healResult.files.map((f: any) => f.path)
     });
   } catch (error: any) {
-    console.error('[Heal API Error]:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, "[Heal API Error]:");
   }
 }

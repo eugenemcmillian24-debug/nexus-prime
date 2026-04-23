@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { NexusOrchestrator } from '@/lib/ai';
+import { errorResponse } from "@/lib/apiError";
 import { z } from 'zod';
 
 const PerformanceSchema = z.object({
@@ -38,7 +39,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ optimizations });
 
   } catch (error: any) {
-    console.error('Performance Analysis API Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return errorResponse(error, "Performance Analysis API Error:");
   }
 }

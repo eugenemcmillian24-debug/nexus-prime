@@ -18,9 +18,32 @@ import { NextResponse } from "next/server";
  *  - Bare `{ error: "Internal Server Error" }`  — debuggable by nobody.
  *  - Bare `{ error: error.message }`            — leaks internals.
  */
+/**
+ * Extract a human-readable message from any thrown/returned value.
+ *
+ * Handles:
+ *   - `Error` subclasses (standard)
+ *   - Plain strings
+ *   - Plain objects with a string `.message` property — importantly this covers
+ *     Supabase's `PostgrestError`, which is NOT an `Error` instance but does
+ *     carry the Postgres diagnostic text on `.message`.
+ */
+function extractMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (
+    error !== null &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+  return "Unknown error";
+}
+
 export function errorResponse(error: unknown, logLabel: string) {
-  const message =
-    error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown error";
+  const message = extractMessage(error);
   const traceId =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
