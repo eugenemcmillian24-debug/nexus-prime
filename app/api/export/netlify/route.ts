@@ -3,6 +3,7 @@ import { z, ZodError } from "zod";
 import crypto from "crypto";
 import { createClient } from "@/lib/supabase/api";
 import { decrypt } from "@/lib/crypto";
+import { errorResponse } from "@/lib/apiError";
 
 const DeploySchema = z.object({
   siteName: z
@@ -167,11 +168,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    console.error("Netlify Deploy Error:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
-      { status: 500 }
-    );
+    return errorResponse(error, "Netlify Deploy Error:");
   }
 }
 

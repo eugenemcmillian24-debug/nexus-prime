@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
+import { errorResponse } from "@/lib/apiError";
 
 export const dynamic = 'force-dynamic';
 
@@ -49,7 +50,6 @@ export async function GET() {
     });
 
   } catch (error: any) {
-    console.error("Seller Stats Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, "Seller Stats Error:");
   }
 }

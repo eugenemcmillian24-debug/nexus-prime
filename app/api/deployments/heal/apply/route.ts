@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,7 +36,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, message: "Fixes applied successfully. Ready for re-deployment." });
   } catch (error: any) {
-    console.error("Heal Apply API Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    return errorResponse(error, "Heal Apply API Error:");
   }
 }

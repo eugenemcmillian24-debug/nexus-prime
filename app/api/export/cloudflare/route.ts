@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { createClient } from "@/lib/supabase/api";
 import { decrypt } from "@/lib/crypto";
+import { errorResponse } from "@/lib/apiError";
 
 const DeploySchema = z.object({
   projectName: z
@@ -132,11 +133,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    console.error("Cloudflare Deploy Error:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
-      { status: 500 }
-    );
+    return errorResponse(error, "Cloudflare Deploy Error:");
   }
 }
 

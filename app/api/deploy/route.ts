@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
 import { NexusOrchestrator } from '@/lib/ai';
+import { errorResponse } from "@/lib/apiError";
 import { z, ZodError } from 'zod';
 
 // userId is intentionally NOT part of the schema — the route always uses the
@@ -61,7 +62,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    console.error('Deployment API Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return errorResponse(error, "Deployment API Error:");
   }
 }

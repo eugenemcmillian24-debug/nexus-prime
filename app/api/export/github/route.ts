@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
 import { decrypt } from "@/lib/crypto";
+import { errorResponse } from "@/lib/apiError";
 
 const ExportSchema = z.object({
   userId: z.string().uuid(),
@@ -183,10 +184,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    console.error("GitHub Export Error:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
-      { status: 500 }
-    );
+    return errorResponse(error, "GitHub Export Error:");
   }
 }

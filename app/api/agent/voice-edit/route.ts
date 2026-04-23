@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { NexusOrchestrator } from "@/lib/ai";
+import { errorResponse } from "@/lib/apiError";
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,7 +46,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ jobId: job.id, updatedCode });
   } catch (error: any) {
-    console.error("Voice Edit API Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    return errorResponse(error, "Voice Edit API Error:");
   }
 }

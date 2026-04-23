@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { NexusOrchestrator } from '@/lib/ai';
+import { errorResponse } from "@/lib/apiError";
 import { z } from 'zod';
 
 const TestSchema = z.object({
@@ -53,7 +54,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, testFiles });
 
   } catch (error: any) {
-    console.error('Test Generation API Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return errorResponse(error, "Test Generation API Error:");
   }
 }

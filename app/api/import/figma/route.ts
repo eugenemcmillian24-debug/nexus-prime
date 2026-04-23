@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { NexusOrchestrator } from "@/lib/ai";
+import { errorResponse } from "@/lib/apiError";
 
 export async function POST(req: NextRequest) {
   try {
@@ -77,7 +78,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(conversionResult);
   } catch (error: any) {
-    console.error("Figma Import API Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    return errorResponse(error, "Figma Import API Error:");
   }
 }

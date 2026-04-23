@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { NexusOrchestrator } from '@/lib/ai';
+import { errorResponse } from "@/lib/apiError";
 import { z } from 'zod';
 
 const AuditSchema = z.object({
@@ -70,7 +71,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
   } catch (error: any) {
-    console.error('Security Audit API Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return errorResponse(error, "Security Audit API Error:");
   }
 }

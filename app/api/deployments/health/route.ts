@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
 import { NexusOrchestrator } from '@/lib/ai';
+import { errorResponse } from "@/lib/apiError";
 
 export async function POST(req: Request) {
   try {
@@ -64,7 +65,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json(analysis);
   } catch (error: any) {
-    console.error('Deployment Health API Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, "Deployment Health API Error:");
   }
 }

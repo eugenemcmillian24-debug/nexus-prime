@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { NexusOrchestrator } from '@/lib/ai';
 import { createClient } from '@/lib/supabase/api';
 import { ZodError } from 'zod';
+import { errorResponse } from '@/lib/apiError';
 
 export async function POST(req: Request) {
   try {
@@ -35,7 +36,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    console.error('Transcription API Error:', error);
-    return NextResponse.json({ error: 'Failed to transcribe audio' }, { status: 500 });
+    return errorResponse(error, 'Transcription API Error');
   }
 }
