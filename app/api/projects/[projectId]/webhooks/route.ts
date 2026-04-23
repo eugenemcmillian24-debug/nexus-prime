@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { errorResponse } from "@/lib/apiError";
 
 export async function GET(
   req: NextRequest,
@@ -29,7 +30,7 @@ export async function GET(
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/projects/[projectId]/webhooks');
 
   return NextResponse.json(data.map(w => ({
     id: w.id,
@@ -82,7 +83,7 @@ export async function POST(
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/projects/[projectId]/webhooks');
 
   return NextResponse.json({
     id: data.id,

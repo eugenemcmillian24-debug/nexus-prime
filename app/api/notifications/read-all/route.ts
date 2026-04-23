@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 export async function POST() {
   const supabase = createClient();
@@ -12,6 +13,6 @@ export async function POST() {
     .eq("user_id", user.id)
     .eq("read", false);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/notifications/read-all');
   return NextResponse.json({ success: true });
 }

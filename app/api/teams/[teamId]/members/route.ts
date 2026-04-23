@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 // GET /api/teams/[teamId]/members
 export async function GET(
@@ -16,7 +17,7 @@ export async function GET(
     .eq("team_id", params.teamId)
     .order("role", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/teams/[teamId]/members');
 
   // Enrich with profile data
   const userIds = members.map((m) => m.user_id);
@@ -69,6 +70,6 @@ export async function POST(
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/teams/[teamId]/members');
   return NextResponse.json(data);
 }

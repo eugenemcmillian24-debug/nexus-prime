@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isNexusPrimeAdmin } from '@/lib/nexus_prime_access';
+import { errorResponse } from "@/lib/apiError";
 
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
 const PROJECT_ID = process.env.VERCEL_PROJECT_ID;
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
 
     const events = await logRes.json();
     return NextResponse.json({ events, deploymentId: targetId });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, '/api/admin/vercel-logs');
   }
 }

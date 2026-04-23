@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { encrypt } from "@/lib/crypto";
+import { errorResponse } from "@/lib/apiError";
 
 // GET /api/keys - List user's API keys
 export async function GET() {
@@ -14,7 +15,7 @@ export async function GET() {
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/keys');
 
   return NextResponse.json(
     data.map((k) => ({
@@ -61,6 +62,6 @@ export async function POST(req: NextRequest) {
     .select("id, provider, label, key_preview, is_active, usage_count, created_at")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/keys');
   return NextResponse.json(data);
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 // GET /api/prompt-history?projectId=...&sort=newest
 export async function GET(req: NextRequest) {
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { data, error } = await query.limit(200);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/prompt-history');
 
   return NextResponse.json(
     data.map((entry) => ({
@@ -85,6 +86,6 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/prompt-history');
   return NextResponse.json(data);
 }

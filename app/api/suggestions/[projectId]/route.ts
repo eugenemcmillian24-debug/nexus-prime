@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 export async function GET(
   req: NextRequest,
@@ -17,7 +18,7 @@ export async function GET(
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/suggestions/[projectId]');
 
   return NextResponse.json(data.map(s => ({
     id: s.id,

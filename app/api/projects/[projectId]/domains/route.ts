@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { errorResponse } from "@/lib/apiError";
 
 export async function GET(
   req: NextRequest,
@@ -29,7 +30,7 @@ export async function GET(
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/projects/[projectId]/domains');
 
   return NextResponse.json(data.map(d => ({
     id: d.id,
@@ -112,7 +113,7 @@ export async function POST(
     if (error.code === "23505") {
       return NextResponse.json({ error: "Domain already registered" }, { status: 409 });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, '/api/projects/[projectId]/domains POST');
   }
 
   return NextResponse.json({

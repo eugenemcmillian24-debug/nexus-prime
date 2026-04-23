@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { errorResponse } from "@/lib/apiError";
 
 export async function PATCH(
   req: NextRequest,
@@ -19,7 +20,7 @@ export async function PATCH(
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/teams/[teamId]/members/[memberId]');
   return NextResponse.json(data);
 }
 
@@ -37,6 +38,6 @@ export async function DELETE(
     .eq("id", params.memberId)
     .eq("team_id", params.teamId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/teams/[teamId]/members/[memberId]');
   return NextResponse.json({ success: true });
 }

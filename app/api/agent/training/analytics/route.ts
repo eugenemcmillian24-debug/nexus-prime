@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
+import { errorResponse } from "@/lib/apiError";
 
 // GET /api/agent/training/analytics - Fetch blueprint analytics for the user
 export async function GET(req: Request) {
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
       modules: modules || [],
       recentTransactions: transactions || []
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, '/api/agent/training/analytics');
   }
 }

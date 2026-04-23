@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 // POST /api/teams - Create a new team
 export async function POST(req: NextRequest) {
@@ -65,6 +66,6 @@ export async function GET() {
     .in("id", teamIds)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/teams');
   return NextResponse.json(teams);
 }

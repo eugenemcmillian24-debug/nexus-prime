@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 // GET /api/projects/files?project_id=xxx - List files in a project
 export async function GET(req: NextRequest) {
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
     .eq("project_id", projectId)
     .order("path");
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/projects/files');
 
   return NextResponse.json({ files: data });
 }
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/projects/files');
 
   // Update project timestamp
   await supabase
@@ -120,7 +121,7 @@ export async function DELETE(req: NextRequest) {
     .eq("project_id", projectId)
     .eq("path", path);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/projects/files');
 
   return NextResponse.json({ success: true });
 }

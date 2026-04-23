@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
+import { errorResponse } from "@/lib/apiError";
 
 // POST /api/marketplace/purchase - Purchase a blueprint
 export async function POST(req: Request) {
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true, newBalance: data.new_balance });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, '/api/marketplace/purchase');
   }
 }

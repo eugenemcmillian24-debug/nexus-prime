@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 // GET /api/versions?project_id=xxx - List versions for a project
 export async function GET(req: NextRequest) {
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
       .eq("version_number", parseInt(versionNumber))
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return errorResponse(error, '/api/versions');
     return NextResponse.json({ version: data });
   }
 
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
     .eq("project_id", projectId)
     .order("version_number", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/versions');
 
   return NextResponse.json({ versions: data });
 }
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/versions');
 
   // Update project version
   await supabase
