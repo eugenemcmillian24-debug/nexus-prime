@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
+import { errorResponse } from "@/lib/apiError";
 
 const PublishSchema = z.object({
   userId: z.string().uuid(),
@@ -61,8 +62,7 @@ export async function POST(req: Request) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: "Validation failed", details: error.errors }, { status: 400 });
     }
-    console.error("Gallery API Error:", error);
-    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
+    return errorResponse(error, "Gallery API Error");
   }
 }
 

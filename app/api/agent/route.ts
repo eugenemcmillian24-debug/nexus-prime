@@ -5,6 +5,7 @@ import { AgentJobSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
 import { waitUntil } from '@vercel/functions';
 import { isNexusPrimeAdmin, TIER_LIMITS, PREMIUM_AGENTS } from '@/lib/nexus_prime_access';
+import { errorResponse } from '@/lib/apiError';
 
 export const maxDuration = 300; // 5 min max for orchestrator pipeline
 
@@ -102,10 +103,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    console.error('Agent API Error:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Internal Server Error' },
-      { status: 500 }
-    );
+    return errorResponse(error, 'Agent API Error');
   }
 }
