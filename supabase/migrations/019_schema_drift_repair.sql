@@ -24,26 +24,40 @@ ALTER TABLE IF EXISTS public.profiles ADD COLUMN IF NOT EXISTS referral_code TEX
 ALTER TABLE IF EXISTS public.profiles ADD COLUMN IF NOT EXISTS referred_by UUID REFERENCES auth.users(id);
 
 -- From 011_agent_training_lab.sql (the reason /api/agent was 500ing)
-ALTER TABLE public.agent_jobs ADD COLUMN IF NOT EXISTS training_module_id UUID REFERENCES public.agent_training_modules(id) ON DELETE SET NULL;
-ALTER TABLE public.user_credits ADD COLUMN IF NOT EXISTS agency_mode BOOLEAN DEFAULT false;
+ALTER TABLE IF EXISTS public.agent_jobs ADD COLUMN IF NOT EXISTS training_module_id UUID REFERENCES public.agent_training_modules(id) ON DELETE SET NULL;
+ALTER TABLE IF EXISTS public.user_credits ADD COLUMN IF NOT EXISTS agency_mode BOOLEAN DEFAULT false;
 
 -- From 012_infrastructure_marketplace.sql
-ALTER TABLE public.custom_domains ADD COLUMN IF NOT EXISTS protocol_fee_paid BOOLEAN DEFAULT false;
-ALTER TABLE public.agent_training_modules ADD COLUMN IF NOT EXISTS price INTEGER DEFAULT 0;
-ALTER TABLE public.agent_training_modules ADD COLUMN IF NOT EXISTS usage_count INTEGER DEFAULT 0;
+ALTER TABLE IF EXISTS public.custom_domains ADD COLUMN IF NOT EXISTS protocol_fee_paid BOOLEAN DEFAULT false;
+ALTER TABLE IF EXISTS public.agent_training_modules ADD COLUMN IF NOT EXISTS price INTEGER DEFAULT 0;
+ALTER TABLE IF EXISTS public.agent_training_modules ADD COLUMN IF NOT EXISTS usage_count INTEGER DEFAULT 0;
 
 -- From 014_agency_whitelabel_refinement.sql (the reason /api/user/agency was 403ing)
-ALTER TABLE public.user_credits ADD COLUMN IF NOT EXISTS agency_config JSONB DEFAULT '{
+ALTER TABLE IF EXISTS public.user_credits ADD COLUMN IF NOT EXISTS agency_config JSONB DEFAULT '{
     "company_name": "",
     "footer_html": "",
     "support_email": "",
     "logo_url": "",
     "hide_nexus_logs": true
 }'::jsonb;
-COMMENT ON COLUMN public.user_credits.agency_config IS 'Stores custom branding and white-label settings for agencies.';
+
+-- COMMENT ON COLUMN errors if the column is missing (which can happen if
+-- user_credits itself was never created in a drifted environment). Guard
+-- with a DO block so the whole migration still succeeds.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'user_credits'
+      AND column_name = 'agency_config'
+  ) THEN
+    COMMENT ON COLUMN public.user_credits.agency_config IS 'Stores custom branding and white-label settings for agencies.';
+  END IF;
+END$$;
 
 -- From 015_export_credentials_hardening.sql
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS github_token_encrypted TEXT;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS netlify_token_encrypted TEXT;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS cloudflare_token_encrypted TEXT;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS cloudflare_account_id TEXT;
+ALTER TABLE IF EXISTS public.profiles ADD COLUMN IF NOT EXISTS github_token_encrypted TEXT;
+ALTER TABLE IF EXISTS public.profiles ADD COLUMN IF NOT EXISTS netlify_token_encrypted TEXT;
+ALTER TABLE IF EXISTS public.profiles ADD COLUMN IF NOT EXISTS cloudflare_token_encrypted TEXT;
+ALTER TABLE IF EXISTS public.profiles ADD COLUMN IF NOT EXISTS cloudflare_account_id TEXT;
