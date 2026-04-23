@@ -47,6 +47,7 @@ const AgentTrainingLab = dynamic(() => import("@/components/features/AgentTraini
 const AgencyWhiteLabelSettings = dynamic(() => import("@/components/features/AgencyWhiteLabelSettings"), { ssr: false });
 const CreditHistory = dynamic(() => import("@/components/CreditHistory"), { ssr: false });
 const AIBuilder = dynamic(() => import("@/components/features/AIBuilder"), { ssr: false });
+const PricingView = dynamic(() => import("@/components/features/PricingView"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -442,16 +443,19 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
         return <AgencyWhiteLabelSettings />;
       case "billing":
         return (
-          <div className="p-8 max-w-4xl mx-auto space-y-8">
-            <h2 className="text-2xl font-bold text-white uppercase tracking-widest">Billing & Credits</h2>
+          <div className="p-8 max-w-5xl mx-auto space-y-10">
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-white uppercase tracking-widest">Billing & Credits</h2>
+              <p className="text-[11px] text-[#666] font-medium">
+                Current tier: <span className="text-[#00ff88] font-bold">{(credits?.tier ?? "free").toString().toUpperCase()}</span>
+                {" · "}Balance: <span className="text-[#00ff88] font-bold">{credits?.balance ?? 0} CR</span>
+              </p>
+            </div>
+
             <CreditHistory userId={userId} />
+
             <div className="pt-8 border-t border-[#1a1a1a]">
-               <button 
-                 onClick={() => setActiveView('home')} // Or redirect to pricing
-                 className="bg-[#00ff88] text-black px-6 py-2 text-[10px] font-bold uppercase tracking-widest"
-               >
-                 Purchase More Credits
-               </button>
+              <PricingView />
             </div>
           </div>
         );
