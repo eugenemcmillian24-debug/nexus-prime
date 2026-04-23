@@ -102,7 +102,10 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    // console.error('Agent API Error:', error); // PROD FIX: Removed console.error
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('Agent API Error:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Internal Server Error' },
+      { status: 500 }
+    );
   }
 }

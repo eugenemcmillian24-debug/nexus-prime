@@ -130,7 +130,7 @@ export async function POST(req: Request) {
     }
     console.error("Refinement API Error:", error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { error: error?.message || "Internal Server Error" },
       { status: 500 }
     );
   }
