@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Github, Terminal, Mail, Lock, Loader2, CheckCircle2, RefreshCw, ArrowLeft, KeyRound } from "lucide-react";
 
@@ -18,6 +19,15 @@ export default function Login() {
   const [step, setStep] = useState<AuthStep>("credentials");
 
   const supabase = createClient();
+  const router = useRouter();
+
+  // After successful auth, navigate to the app root. `router.refresh()` forces
+  // Next.js to re-run server components with the freshly-set Supabase session
+  // cookies so middleware and layouts pick up the authenticated state.
+  const redirectAfterAuth = () => {
+    router.replace("/");
+    router.refresh();
+  };
 
   const handleOAuthLogin = async () => {
     setError(null);
@@ -39,7 +49,11 @@ export default function Login() {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        // Successful login — page.tsx auth state change listener will redirect
+        // `/auth/login` is a separate route from `/`, so page.tsx's
+        // onAuthStateChange listener never fires here. Drive the redirect
+        // explicitly instead of relying on a listener on a different page.
+        redirectAfterAuth();
+        return;
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -123,7 +137,9 @@ export default function Login() {
 
       if (data.session) {
         setStep("success");
-        // Session is now active — auth state listener will redirect
+        // Give the success screen a beat to render, then drive the redirect
+        // explicitly (see `redirectAfterAuth` above for why).
+        setTimeout(redirectAfterAuth, 800);
       }
     } catch (err: any) {
       const msg = err.message || "Verification failed";
