@@ -23,8 +23,8 @@ const REASONER_MODELS: ModelOption[] = [
 const CODER_MODELS: ModelOption[] = [
   { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B", provider: "Groq", description: "Fast code generation", speed: "fast", quality: "standard", creditCost: 5, icon: Zap },
   { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", provider: "Groq", description: "Higher quality code output", speed: "medium", quality: "high", creditCost: 10, icon: Zap },
-  { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", provider: "OpenRouter", description: "Best-in-class code quality", speed: "slow", quality: "premium", creditCost: 25, icon: Zap },
-  { id: "google/gemini-2.0-flash", name: "Gemini 2.0 Flash", provider: "OpenRouter", description: "Fast & capable coding", speed: "fast", quality: "high", creditCost: 8, icon: Zap },
+  { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5", provider: "OpenRouter", description: "Best-in-class code quality", speed: "slow", quality: "premium", creditCost: 25, icon: Zap },
+  { id: "google/gemini-2.0-flash-001", name: "Gemini 2.0 Flash", provider: "OpenRouter", description: "Fast & capable coding", speed: "fast", quality: "high", creditCost: 8, icon: Zap },
 ];
 
 const VISION_MODELS: ModelOption[] = [
@@ -46,7 +46,7 @@ export interface ModelSelection {
 }
 
 export default function ModelSelector({
-  selection = { reasoner: "llama-3.3-70b-versatile", coder: "llama-3.3-70b-versatile", vision: "google/gemini-2.0-flash" },
+  selection = { reasoner: "llama-3.3-70b-versatile", coder: "llama-3.3-70b-versatile", vision: "google/gemini-2.0-flash-001" },
   onChange = () => {},
 }: {
   selection?: ModelSelection;
