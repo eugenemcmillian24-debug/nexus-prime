@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
 import { TIER_LIMITS } from '@/lib/nexus_prime_access';
+import { errorResponse } from '@/lib/apiError';
 
 export async function GET(req: Request) {
   try {
@@ -21,6 +22,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ tier, seatLimit });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'User Tier API Error');
   }
 }

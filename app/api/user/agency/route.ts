@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
+import { errorResponse } from '@/lib/apiError';
 
 export async function GET() {
   const supabase = createClient();
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'User Agency Update Error');
   }
 
   return NextResponse.json(data);
