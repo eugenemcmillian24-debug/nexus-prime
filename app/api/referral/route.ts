@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
+import { errorResponse } from "@/lib/apiError";
 
 const CreateReferralSchema = z.object({
   userId: z.string().uuid(),
@@ -79,8 +80,7 @@ export async function POST(req: Request) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: "Validation failed", details: error.errors }, { status: 400 });
     }
-    console.error("Referral API Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return errorResponse(error, "Referral API Error");
   }
 }
 

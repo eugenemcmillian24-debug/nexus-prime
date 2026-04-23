@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
 import { Groq } from "groq-sdk";
 import { isNexusPrimeAdmin } from "@/lib/nexus_prime_access";
+import { errorResponse } from "@/lib/apiError";
 
 const RefineSchema = z.object({
   userId: z.string().uuid(),
@@ -128,10 +129,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    console.error("Refinement API Error:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+    return errorResponse(error, "Refinement API Error");
   }
 }
