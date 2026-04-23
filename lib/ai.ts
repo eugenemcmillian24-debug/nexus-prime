@@ -6,38 +6,89 @@ import { TIER_LIMITS } from './nexus_prime_constants';
 // Primary AI completion path: cycles through free/cheap providers before
 // falling back to the class-level Groq SDK instance.
 
-const FALLBACK_PROVIDERS = [
+// Provider shape: OpenAI-compat providers use POST <url> with `{model, messages, ...}`.
+// The `google` provider needs the native generateContent shape (key in query string,
+// `contents:[{parts:[{text}]}]` body) so we set `shape: "google"` on it and branch in
+// aiComplete/aiCompleteStream. Every other provider is standard OpenAI-compat.
+type ProviderShape = "openai" | "google";
+
+interface Provider {
+  name: string;
+  url: string;
+  key: string;
+  models: string[];
+  shape?: ProviderShape;
+}
+
+const FALLBACK_PROVIDERS: Provider[] = [
   {
+    // OpenCode Zen — free-tier curated models (OpenAI-compatible). All five slugs
+    // below are marked `Free` in https://opencode.ai/docs/zen#pricing. Listed most-
+    // likely-to-be-available first so transient capacity issues fall through quickly.
     url: "https://opencode.ai/zen/v1/chat/completions",
     key: process.env.OPENCODE_ZEN_API_KEY!,
-    models: ["minimax-m2.5-free", "nemotron-3-super-free"],
-    name: "zen-free"
+    models: [
+      "minimax-m2.5-free",
+      "nemotron-3-super-free",
+      "hy3-preview-free",
+      "big-pickle",
+      "ling-2.6-flash",
+    ],
+    name: "zen-free",
   },
   {
     url: "https://api.groq.com/openai/v1/chat/completions",
     key: process.env.GROQ_API_KEY!,
-    // mixtral-8x7b-32768 was deprecated by Groq; replaced with
-    // llama-3.1-8b-instant as the fast fallback tier.
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
-    name: "groq"
+    // Verified against https://api.groq.com/openai/v1/models on 2026-04-23.
+    // llama-3.1-70b-versatile was retired; use llama-3.3-70b-versatile.
+    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen/qwen3-32b"],
+    name: "groq",
   },
   {
     url: "https://openrouter.ai/api/v1/chat/completions",
     key: process.env.OPENROUTER_API_KEY!,
-    // claude-3-haiku was retired on OpenRouter; use the 3.5 haiku slug.
-    models: ["google/gemini-flash-1.5", "anthropic/claude-3-5-haiku"],
-    name: "openrouter"
+    // Verified against https://openrouter.ai/api/v1/models on 2026-04-23.
+    // google/gemini-flash-1.5 was removed — replaced with gemini-2.0-flash-001.
+    // claude-3-5-haiku is the current active slug (3.5-sonnet retired; use
+    // claude-sonnet-4.5 if a stronger coder-tier fallback is needed).
+    models: [
+      "google/gemini-2.0-flash-001",
+      "anthropic/claude-3-5-haiku",
+      "anthropic/claude-sonnet-4.5",
+    ],
+    name: "openrouter",
   },
   {
-    url: "https://generativelanguage.googleapis.com/v1beta/models",
+    // Google native generateContent API. Requires shape:"google" branch below.
     // GOOGLE_AI_KEY is the canonical env var used by every other route in
-    // this repo (search for "googleAIKey"). GEMINI_API_KEY is accepted as
-    // a legacy fallback for older deployments.
+    // this repo; GEMINI_API_KEY kept as a legacy fallback.
+    url: "https://generativelanguage.googleapis.com/v1beta/models",
     key: (process.env.GOOGLE_AI_KEY ?? process.env.GEMINI_API_KEY)!,
-    models: ["gemini-1.5-flash"],
-    name: "gemini"
-  }
+    // Verified via v1beta/models ListModels on 2026-04-23. gemini-1.5-flash was
+    // removed from v1beta; gemini-flash-latest always resolves to the current
+    // recommended flash tier, gemini-2.5-flash is a stable fallback.
+    models: ["gemini-flash-latest", "gemini-2.5-flash"],
+    name: "gemini",
+    shape: "google",
+  },
 ];
+
+// Translate OpenAI-style messages into the Google generateContent `contents` shape.
+function toGoogleContents(messages: { role: string; content: string }[]) {
+  const systemText = messages
+    .filter((m) => m.role === "system")
+    .map((m) => m.content)
+    .join("\n\n");
+  const convo = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+  const body: Record<string, unknown> = { contents: convo };
+  if (systemText) body.systemInstruction = { parts: [{ text: systemText }] };
+  return body;
+}
 
 interface AIOptions {
   temperature?: number
@@ -53,19 +104,32 @@ export async function aiComplete(
 
     for (const model of provider.models) {
       try {
-        const res = await fetch(provider.url, {
+        const isGoogle = provider.shape === "google";
+        const url = isGoogle
+          ? `${provider.url}/${model}:generateContent?key=${provider.key}`
+          : provider.url;
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (!isGoogle) headers["Authorization"] = `Bearer ${provider.key}`;
+        const body = isGoogle
+          ? {
+              ...toGoogleContents(messages),
+              generationConfig: {
+                temperature: options?.temperature ?? 0.7,
+                maxOutputTokens: options?.max_tokens ?? 2048,
+              },
+            }
+          : {
+              model,
+              messages,
+              temperature: options?.temperature ?? 0.7,
+              max_tokens: options?.max_tokens ?? 2048,
+            };
+
+        const res = await fetch(url, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${provider.key}`
-          },
-          body: JSON.stringify({
-            model,
-            messages,
-            temperature: options?.temperature ?? 0.7,
-            max_tokens: options?.max_tokens ?? 2048
-          }),
-          signal: AbortSignal.timeout(15000)
+          headers,
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(15000),
         })
 
         if (!res.ok) {
@@ -74,7 +138,11 @@ export async function aiComplete(
         }
 
         const data = await res.json()
-        return data.choices?.[0]?.message?.content ?? ""
+        const content = isGoogle
+          ? data.candidates?.[0]?.content?.parts?.[0]?.text
+          : data.choices?.[0]?.message?.content;
+        if (!content) continue;
+        return content as string;
       } catch (err) {
         console.warn(`[${provider.name}/${model}] error:`, err)
         continue
@@ -91,6 +159,11 @@ export async function aiCompleteStream(
 ): Promise<ReadableStream> {
   for (const provider of FALLBACK_PROVIDERS) {
     if (!provider.key) continue
+    // The Google provider streams via a different protocol (SSE on
+    // :streamGenerateContent). Since all existing callers expect an
+    // OpenAI-compat SSE body, skip Google here and fall through to the
+    // OpenAI-compat providers for streaming only.
+    if (provider.shape === "google") continue
 
     for (const model of provider.models) {
       try {

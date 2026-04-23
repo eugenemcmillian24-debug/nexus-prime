@@ -77,7 +77,7 @@ Respond ONLY with valid JSON in this exact format:
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "llama-3.1-70b-versatile",
+          model: "llama-3.3-70b-versatile",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: `File: ${filePath}\nLanguage: ${language || "unknown"}\n\n\`\`\`\n${code}\n\`\`\`` },
@@ -111,7 +111,7 @@ Respond ONLY with valid JSON in this exact format:
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "anthropic/claude-3.5-sonnet",
+          model: "anthropic/claude-sonnet-4.5",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: `File: ${filePath}\nLanguage: ${language || "unknown"}\n\n\`\`\`\n${code}\n\`\`\`` },
