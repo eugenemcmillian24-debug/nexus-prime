@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 // Helper to generate a random token
 function generateToken() {
@@ -44,7 +45,7 @@ export async function GET(
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/projects/[projectId]/tokens');
 
   return NextResponse.json(data.map(t => ({
     id: t.id,
@@ -109,7 +110,7 @@ export async function POST(
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/projects/[projectId]/tokens');
 
   return NextResponse.json({
     token: rawToken,

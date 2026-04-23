@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { errorResponse } from "@/lib/apiError";
 
 export async function POST(req: NextRequest) {
   const supabase = createClient();
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/deployments/rollback');
 
   // Simulate deployment...
   

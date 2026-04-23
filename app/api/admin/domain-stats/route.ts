@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
 import { isNexusPrimeAdmin } from '@/lib/nexus_prime_access';
+import { errorResponse } from "@/lib/apiError";
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +35,7 @@ export async function GET(req: Request) {
       pending: pending || 0,
       feesCollected
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, '/api/admin/domain-stats');
   }
 }

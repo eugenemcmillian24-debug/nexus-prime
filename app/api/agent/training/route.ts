@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
+import { errorResponse } from "@/lib/apiError";
 
 // GET /api/agent/training - Fetch user's training modules or public ones
 export async function GET(req: Request) {
@@ -24,8 +25,8 @@ export async function GET(req: Request) {
     if (error) throw error;
 
     return NextResponse.json({ modules: data });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, '/api/agent/training');
   }
 }
 
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
     if (error) throw error;
 
     return NextResponse.json({ module: data });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, '/api/agent/training');
   }
 }

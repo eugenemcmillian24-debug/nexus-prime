@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 export async function POST(
   req: NextRequest,
@@ -36,7 +37,7 @@ export async function POST(
         updated_at: new Date().toISOString(),
       }, { onConflict: "project_id,path" });
 
-    if (fileError) return NextResponse.json({ error: fileError.message }, { status: 500 });
+    if (fileError) return errorResponse(fileError, '/api/suggestions/[projectId]/[suggestionId]/ly');
   }
 
   // Mark as applied
@@ -45,7 +46,7 @@ export async function POST(
     .update({ applied: true })
     .eq("id", suggestionId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/suggestions/[projectId]/[suggestionId]/ly');
 
   return NextResponse.json({ success: true });
 }

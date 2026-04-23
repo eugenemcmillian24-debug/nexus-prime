@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 // GET /api/marketplace/templates?category=coding&sort=popular&q=react
 export async function GET(req: NextRequest) {
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { data, error } = await q.limit(50);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/marketplace/templates');
 
   // Check which ones user has liked
   let likedIds = new Set<string>();
@@ -104,6 +105,6 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/marketplace/templates');
   return NextResponse.json(data);
 }

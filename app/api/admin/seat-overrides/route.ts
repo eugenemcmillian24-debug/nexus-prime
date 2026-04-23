@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
 import { isNexusPrimeAdmin } from '@/lib/nexus_prime_access';
+import { errorResponse } from "@/lib/apiError";
 
 export async function GET() {
   try {
@@ -18,8 +19,8 @@ export async function GET() {
     return NextResponse.json({ 
       overrides: data.map(d => ({ userId: d.user_id, seats: d.seat_limit_override })) 
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, '/api/admin/seat-overrides');
   }
 }
 
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
     if (error) throw error;
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, '/api/admin/seat-overrides');
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 export async function GET(
   req: NextRequest,
@@ -17,7 +18,7 @@ export async function GET(
     .select("path, content")
     .eq("project_id", projectId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/suggestions/[projectId]/context');
 
   const components = files.filter(f => f.path.includes("components/")).map(f => f.path);
   const routes = files.filter(f => f.path.includes("app/") || f.path.includes("pages/")).map(f => f.path);

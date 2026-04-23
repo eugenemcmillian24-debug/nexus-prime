@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { TIER_LIMITS } from "@/lib/nexus_prime_access";
+import { errorResponse } from "@/lib/apiError";
 
 // POST /api/teams/[teamId]/invites - Send an invite
 export async function POST(
@@ -76,7 +77,7 @@ export async function POST(
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/teams/[teamId]/invites');
 
   // Log activity
   await supabase.from("activity_feed").insert({
@@ -105,6 +106,6 @@ export async function GET(
     .eq("team_id", params.teamId)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/teams/[teamId]/invites');
   return NextResponse.json(data);
 }

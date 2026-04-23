@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 // GET /api/projects - List user's projects
 export async function GET(req: NextRequest) {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/projects');
 
   return NextResponse.json({
     projects: data,
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (projectError) return NextResponse.json({ error: projectError.message }, { status: 500 });
+  if (projectError) return errorResponse(projectError, '/api/projects');
 
   // Create initial files if provided
   if (files && files.length > 0) {
@@ -120,7 +121,7 @@ export async function PATCH(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/projects');
 
   return NextResponse.json({ project: data });
 }
@@ -142,7 +143,7 @@ export async function DELETE(req: NextRequest) {
     .eq("id", id)
     .eq("user_id", userId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/projects');
 
   return NextResponse.json({ success: true });
 }

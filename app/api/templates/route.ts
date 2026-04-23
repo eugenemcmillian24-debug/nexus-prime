@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
+import { errorResponse } from "@/lib/apiError";
 
 const MOCK_TEMPLATES = [
   {
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
       message: 'Project published as template!',
       template: { id: Math.random().toString(36).substr(2, 9), name, description }
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, '/api/templates');
   }
 }

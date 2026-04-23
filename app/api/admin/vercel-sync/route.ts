@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isNexusPrimeAdmin } from '@/lib/nexus_prime_access';
+import { errorResponse } from "@/lib/apiError";
 
 // TOKEN AND PROJECT ID EXTRACTED FROM SYSTEM INTEGRATION STATUS
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
@@ -18,8 +19,8 @@ export async function GET() {
 
     const data = await res.json();
     return NextResponse.json({ envs: data.envs });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, '/api/admin/vercel-sync');
   }
 }
 
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, '/api/admin/vercel-sync');
   }
 }

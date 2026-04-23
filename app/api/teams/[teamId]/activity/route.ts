@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { errorResponse } from "@/lib/apiError";
 
 export async function GET(
   req: NextRequest,
@@ -16,7 +17,7 @@ export async function GET(
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/teams/[teamId]/activity');
 
   // Enrich with user data
   const userIds = Array.from(new Set(data.map((item) => item.user_id)));

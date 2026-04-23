@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 
 // POST /api/reviews - Request a new AI code review
 export async function POST(req: NextRequest) {
@@ -184,7 +185,7 @@ export async function GET(req: NextRequest) {
   if (fileId) query = query.eq("file_id", fileId);
 
   const { data, error } = await query.limit(50);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return errorResponse(error, '/api/reviews');
 
   return NextResponse.json(
     data.map((r) => ({

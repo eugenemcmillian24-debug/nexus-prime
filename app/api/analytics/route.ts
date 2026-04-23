@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
+import { errorResponse } from "@/lib/apiError";
 import { z, ZodError } from "zod";
 
 export const dynamic = 'force-dynamic';
@@ -40,11 +41,11 @@ export async function GET(req: Request) {
     if (error) throw error;
 
     return NextResponse.json(data);
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: "Invalid parameters", details: error.errors }, { status: 400 });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, '/api/analytics GET');
   }
 }
 
@@ -80,10 +81,10 @@ export async function POST(req: Request) {
     if (error) throw error;
 
     return NextResponse.json({ success: true }, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: "Invalid input", details: error.errors }, { status: 400 });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, '/api/analytics POST');
   }
 }
