@@ -10,6 +10,7 @@ import { z, ZodError } from 'zod';
 const DeploySchema = z.object({
   jobId: z.string().uuid('Invalid job ID format'),
   projectName: z.string().min(1).max(100).optional(),
+  platform: z.enum(['vercel', 'netlify', 'cloudflare']).default('vercel'),
 });
 
 export async function POST(req: Request) {
@@ -20,8 +21,7 @@ export async function POST(req: Request) {
     const userId = user.id;
 
     const body = await req.json();
-
-    const { jobId, projectName } = DeploySchema.parse(body);
+    const { jobId, projectName, platform } = DeploySchema.parse(body);
 
     // 2. Fetch Job Result
     const { data: job, error: jobError } = await supabase
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
     if (jobError || !job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
 
-    // 3. Security Check (Ensure user owns the job)
+    // 3. Security Check
     if (job.user_id !== userId) {
       return NextResponse.json({ error: 'Unauthorized Deployment' }, { status: 403 });
     }
@@ -42,7 +42,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No files found in the job result' }, { status: 400 });
     }
 
-    // 4. Deploy to Vercel
+    // Fetch user's agency config for white-labeling
+    const { data: credits } = await supabase
+      .from('user_credits')
+      .select('agency_mode, agency_config')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const agencyConfig = (credits?.agency_mode) ? credits.agency_config : null;
+
     const orchestrator = new NexusOrchestrator({
       groqKey: process.env.GROQ_API_KEY!,
       openRouterKey: process.env.OPENROUTER_API_KEY!,
@@ -51,7 +59,16 @@ export async function POST(req: Request) {
       supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
     });
 
-    const deployment = await orchestrator.deployToVercel(files, projectName || `nexus-build-${jobId.slice(0, 8)}`);
+    let deployment;
+    const name = projectName || `nexus-build-${jobId.slice(0, 8)}`;
+
+    if (platform === 'vercel') {
+      deployment = await orchestrator.deployToVercel(files, name);
+    } else if (platform === 'netlify') {
+      deployment = await orchestrator.deployToNetlify(files, name, agencyConfig);
+    } else if (platform === 'cloudflare') {
+      deployment = await orchestrator.deployToCloudflare(files, name, agencyConfig);
+    }
 
     return NextResponse.json(deployment);
 
