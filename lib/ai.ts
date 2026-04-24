@@ -143,6 +143,22 @@ export type TestResults = {
   executor: "ast-imports";
 };
 
+// ---- Reviewer agent types -----------------------------------------------
+// The Reviewer runs AFTER the Executor to perform a functional review of
+// the build against the original plan. "Does this actually implement what
+// was asked for?" — not "does it parse" (Linter) or "do the tests import
+// correctly" (Executor). Uses claude-sonnet-4.5 via OpenRouter.
+
+export type ReviewResults = {
+  plan_alignment: "high" | "medium" | "low";
+  missing_features: string[];
+  issues: string[];
+  suggestions: string;
+  severity: "critical" | "warning" | "info";
+  reviewer: string;
+  error?: string;
+};
+
 export function extractImports(
   source: string,
 ): { symbols: string[]; source: string }[] {
@@ -413,6 +429,45 @@ RULES:
 5. OUTPUT: Return ONLY the corrected raw JSON string. No conversational filler.
 
 If the code is already perfect, return the original JSON unchanged.
+`.trim();
+
+const REVIEWER_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Reviewer Agent. You perform a FUNCTIONAL review of a completed build.
+
+This is NOT a syntax review (the Linter already handled that) and NOT a test-import review (the Executor handled that).
+Your only job: "Does this code actually implement what the plan asked for?"
+
+INPUTS:
+1. The original build plan (what the user asked for).
+2. The final source files produced by the Coder + Linter (path + content).
+3. Optional: executor test results (which generated tests had broken imports).
+
+RULES:
+1. CROSS-REFERENCE each requirement in the plan against the files. A requirement is "met" only if you can point to the specific file and behavior that satisfies it.
+2. IDENTIFY MISSING FEATURES — things the plan explicitly asks for that are absent or stubbed out.
+3. FLAG FUNCTIONAL ISSUES — things that are present but broken or semantically wrong (e.g. a counter that doesn't actually increment, an API route that returns hardcoded data, a form that swallows its submit handler).
+4. DO NOT nitpick style, formatting, or minor naming — the Linter and human reviewers own that.
+5. DO NOT invent requirements the plan doesn't mention.
+6. BE CONCISE. The "suggestions" field is free-form but cap at ~3 sentences.
+
+OUTPUT: Return ONLY a raw JSON object with this exact shape — no prose, no markdown fences:
+{
+  "plan_alignment": "high" | "medium" | "low",
+  "missing_features": ["feature1", "feature2"],
+  "issues": ["issue1", "issue2"],
+  "suggestions": "free-form text, <= 3 sentences",
+  "severity": "critical" | "warning" | "info"
+}
+
+SEVERITY GUIDE:
+- "critical": build does not implement the core ask (missing the main feature the plan is about).
+- "warning": core ask is met but material features are missing or partially broken.
+- "info": core ask is met, everything works; minor suggestions only.
+
+plan_alignment guide:
+- "high": every concrete requirement in the plan maps to a file + behavior.
+- "medium": the headline feature works but ancillary requirements are missing.
+- "low": the headline feature is missing or broken.
 `.trim();
 
 const TESTER_SYSTEM_PROMPT = `
@@ -767,6 +822,9 @@ export class NexusOrchestrator {
    * 3. Orchestrator (Llama-70B) -> Plan / Tool Selection
    * 4. Coder (Llama-8B) -> Execution / Code Generation
    * 5. Linter (Llama-70B) -> Quality Assurance
+   * 6. Tester -> Generates Vitest suites for the final code
+   * 7. Executor -> AST-lite validates tester imports; retries Coder once on failure
+   * 8. Reviewer (Claude Sonnet 4.5 via OpenRouter) -> Functional review against plan
    */
   async executeJob(jobId: string, options?: { isUnthrottled?: boolean }) {
     try {
@@ -1007,11 +1065,19 @@ export class NexusOrchestrator {
         }
       }
 
+      // STEP 8: REVIEW - FUNCTIONAL REVIEW AGAINST THE PLAN
+      // Non-blocking: reviewer failures log an event + return a
+      // fallback ReviewResults; they never mark the build failed.
+      // Uses claude-sonnet-4.5 on OpenRouter directly (bypasses the
+      // Groq fallback chain) for the strongest reasoner available.
+      const reviewResults = await this.runReviewerAgent(jobId, plan, finalCode, testResults);
+
       // FINAL: COMPLETE
       await this.supabase.from('agent_jobs').update({
         status: 'completed',
         result: { reasoning, plan, code: finalCode, visualAnalysis },
         test_results: testResults,
+        review_results: reviewResults,
       }).eq('id', jobId);
 
       // Auto-sync AI-generated code into project files
@@ -1240,6 +1306,174 @@ export class NexusOrchestrator {
     );
 
     return results;
+  }
+
+  /**
+   * Functional review of the completed build against the original plan.
+   *
+   * Runs AFTER the Executor. Uses claude-sonnet-4.5 on OpenRouter directly
+   * (not the Groq fallback chain) because we want the strongest available
+   * reasoner for the "does this match the plan?" question. Non-blocking:
+   * any failure is logged as a reviewer event and returned as a
+   * ReviewResults with severity='info' and an `error` field populated —
+   * never throws out of the method.
+   */
+  private async runReviewerAgent(
+    jobId: string,
+    plan: string,
+    code: { files?: { path: string; content: string }[] },
+    testResults: TestResults | null,
+  ): Promise<ReviewResults | null> {
+    const safeLog = async (type: string, content: string) => {
+      try {
+        await this.logEvent(jobId, 'reviewer', type, content);
+      } catch {
+        /* intentionally ignore */
+      }
+    };
+
+    const fallback = (reason: string): ReviewResults => ({
+      plan_alignment: 'medium',
+      missing_features: [],
+      issues: [],
+      suggestions: '',
+      severity: 'info',
+      reviewer: 'claude-sonnet-4.5',
+      error: reason,
+    });
+
+    try {
+      if (!code?.files || code.files.length === 0) {
+        await safeLog('thought', 'No source files to review. Skipping reviewer agent.');
+        return null;
+      }
+
+      // Use the constructor-injected key (set from config.openRouterKey at
+      // line 793), not process.env directly — matches the callGeminiVision
+      // pattern and makes the class testable with a different key.
+      const apiKey = this.openRouterKey;
+      if (!apiKey || apiKey === 'undefined') {
+        await safeLog('error', 'openRouterKey is not configured — skipping reviewer.');
+        return fallback('openRouterKey missing');
+      }
+
+      // Strip test files from the payload. By the time we get here,
+      // finalCode.files has been mutated to include the Tester-generated
+      // tests merged alongside source (see the two merge sites in
+      // executeJob). The REVIEWER_SYSTEM_PROMPT tells the model it's
+      // looking at "source files produced by the Coder + Linter" — sending
+      // tests would both waste tokens against the 2000-token budget and
+      // let the reviewer count test-file assertions/mocks as
+      // implementations of the planned features.
+      const testPaths = new Set(
+        (code as { tests?: { path: string }[] }).tests?.map((t) => t.path) ?? [],
+      );
+      const sourceOnly = code.files.filter((f) => !testPaths.has(f.path));
+
+      if (sourceOnly.length === 0) {
+        await safeLog('thought', 'No non-test source files to review. Skipping reviewer.');
+        return null;
+      }
+
+      await safeLog(
+        'thought',
+        `Reviewing ${sourceOnly.length} source file(s) against the plan with claude-sonnet-4.5...`,
+      );
+
+      const userPayload = {
+        plan,
+        files: sourceOnly.map((f) => ({ path: f.path, content: f.content })),
+        test_results: testResults
+          ? { passed: testResults.passed.length, failed: testResults.failed }
+          : null,
+      };
+
+      // AbortSignal.timeout keeps the fetch from hanging past the Vercel
+      // serverless execution limit. Without it, an unresponsive OpenRouter
+      // would kill the process before our outer try/catch runs, leaving
+      // the job stuck at status='running' because neither the
+      // status='completed' update nor the status='failed' catch handler
+      // get a chance to execute. 30s is ~2x the observed p99 for
+      // claude-sonnet-4.5 reviews at max_tokens:2000.
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'anthropic/claude-sonnet-4.5',
+          messages: [
+            { role: 'system', content: REVIEWER_SYSTEM_PROMPT },
+            { role: 'user', content: JSON.stringify(userPayload) },
+          ],
+          temperature: 0.2,
+          // Same budget constraint as /api/reviews — claude-sonnet-4.5
+          // on OpenRouter free tier 402s above ~2k output tokens.
+          max_tokens: 2000,
+          response_format: { type: 'json_object' },
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        const reason = `openrouter ${res.status}: ${body.slice(0, 200)}`;
+        await safeLog('error', `Reviewer upstream failed: ${reason}`);
+        return fallback(reason);
+      }
+
+      const data = await res.json();
+      const content: string = data?.choices?.[0]?.message?.content ?? '';
+      if (!content.trim()) {
+        await safeLog('error', 'Reviewer returned an empty response body.');
+        return fallback('empty response');
+      }
+
+      const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const parsed = parseJsonLoose<{
+        plan_alignment?: unknown;
+        missing_features?: unknown;
+        issues?: unknown;
+        suggestions?: unknown;
+        severity?: unknown;
+      }>(cleaned);
+      if (!parsed) {
+        await safeLog('error', `Reviewer returned unparseable JSON: ${cleaned.slice(0, 160)}`);
+        return fallback('unparseable JSON');
+      }
+
+      const isAlignment = (v: unknown): v is ReviewResults['plan_alignment'] =>
+        v === 'high' || v === 'medium' || v === 'low';
+      const isSeverity = (v: unknown): v is ReviewResults['severity'] =>
+        v === 'critical' || v === 'warning' || v === 'info';
+
+      const review: ReviewResults = {
+        plan_alignment: isAlignment(parsed.plan_alignment) ? parsed.plan_alignment : 'medium',
+        missing_features: Array.isArray(parsed.missing_features)
+          ? parsed.missing_features.filter((x): x is string => typeof x === 'string')
+          : [],
+        issues: Array.isArray(parsed.issues)
+          ? parsed.issues.filter((x): x is string => typeof x === 'string')
+          : [],
+        suggestions: typeof parsed.suggestions === 'string' ? parsed.suggestions : '',
+        severity: isSeverity(parsed.severity) ? parsed.severity : 'info',
+        reviewer: 'claude-sonnet-4.5',
+      };
+
+      const summaryParts = [
+        `alignment=${review.plan_alignment}`,
+        `severity=${review.severity}`,
+        `missing=${review.missing_features.length}`,
+        `issues=${review.issues.length}`,
+      ];
+      await safeLog('completion', `Review complete: ${summaryParts.join(', ')}`);
+      return review;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await safeLog('error', `Reviewer agent aborted: ${message}`);
+      return fallback(message);
+    }
   }
 
   private async callGeminiVision(imageUrl: string, prompt: string) {
