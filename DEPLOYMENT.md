@@ -39,9 +39,7 @@ SUPABASE_URL=your_supabase_url
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # AI / LLM Keys
-GROQ_API_KEY=your_groq_key
-OPENROUTER_API_KEY=your_openrouter_key
-GOOGLE_AI_KEY=your_google_ai_key          # Required for Gemini Vision
+OPENCODE_ZEN_API_KEY=your_zen_key
 
 # Stripe
 STRIPE_SECRET_KEY=sk_live_...

@@ -27,9 +27,7 @@ export async function POST(req: NextRequest) {
     if (jobError) throw jobError;
 
     const orchestrator = new NexusOrchestrator({
-      groqKey: process.env.GROQ_API_KEY!,
-      openRouterKey: process.env.OPENROUTER_API_KEY!,
-      googleAIKey: process.env.GOOGLE_AI_KEY!,
+      zenKey: process.env.OPENCODE_ZEN_API_KEY!,
       supabaseUrl: (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)!,
       supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
     });

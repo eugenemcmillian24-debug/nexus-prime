@@ -19,9 +19,7 @@ interface ApiKeyManagerProps {
 }
 
 const PROVIDERS = [
-  { id: "groq", name: "Groq", icon: "⚡", color: "#f97316", placeholder: "gsk_...", docs: "https://console.groq.com/keys" },
-  { id: "gemini", name: "Google Gemini", icon: "🔷", color: "#3b82f6", placeholder: "AIza...", docs: "https://aistudio.google.com/apikey" },
-  { id: "openrouter", name: "OpenRouter", icon: "🔮", color: "#8b5cf6", placeholder: "sk-or-...", docs: "https://openrouter.ai/keys" },
+  { id: "zen", name: "Zen (OpenCode)", icon: "☯️", color: "#00ff88", placeholder: "opencode_...", docs: "https://opencode.ai/docs/zen" },
   { id: "openai", name: "OpenAI", icon: "🤖", color: "#10b981", placeholder: "sk-...", docs: "https://platform.openai.com/api-keys" },
   { id: "anthropic", name: "Anthropic", icon: "🧠", color: "#ec4899", placeholder: "sk-ant-...", docs: "https://console.anthropic.com/settings/keys" },
   { id: "vercel", name: "Vercel", icon: "▲", color: "#ffffff", placeholder: "vercel_...", docs: "https://vercel.com/account/tokens" },

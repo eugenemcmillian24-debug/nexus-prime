@@ -1,78 +1,26 @@
-import { Groq } from 'groq-sdk';
 import { createClient } from '@supabase/supabase-js';
 import { TIER_LIMITS } from './nexus_prime_constants';
 import crypto from 'crypto';
 
-// ─── FREE-FIRST FALLBACK CHAIN ───────────────────────────────────────────────
-// Primary AI completion path: cycles through free/cheap providers before
-// falling back to the class-level Groq SDK instance.
+// ─── ZEN (OPENCODE) AI ENGINE ───────────────────────────────────────────────
+// Unified AI completion path using the Zen OpenAI-compatible endpoint.
 
-// Provider shape: OpenAI-compat providers use POST <url> with `{model, messages, ...}`.
-// The `google` provider needs the native generateContent shape (key in query string,
-// `contents:[{parts:[{text}]}]` body) so we set `shape: "google"` on it and branch in
-// aiComplete/aiCompleteStream. Every other provider is standard OpenAI-compat.
-type ProviderShape = "openai" | "google";
+const ZEN_ENDPOINT = "https://opencode.ai/zen/v1/chat/completions";
 
-interface Provider {
-  name: string;
-  url: string;
-  key: string;
-  models: string[];
-  shape?: ProviderShape;
-}
-
-const FALLBACK_PROVIDERS: Provider[] = [
-  {
-    // OpenCode Zen — free-tier curated models (OpenAI-compatible). All five slugs
-    // below are marked `Free` in https://opencode.ai/docs/zen#pricing. Listed most-
-    // likely-to-be-available first so transient capacity issues fall through quickly.
-    url: "https://opencode.ai/zen/v1/chat/completions",
-    key: process.env.OPENCODE_ZEN_API_KEY!,
-    models: [
-      "minimax-m2.5-free",
-      "nemotron-3-super-free",
-      "hy3-preview-free",
-      "big-pickle",
-      "ling-2.6-flash",
-    ],
-    name: "zen-free",
-  },
-  {
-    url: "https://api.groq.com/openai/v1/chat/completions",
-    key: process.env.GROQ_API_KEY!,
-    // Verified against https://api.groq.com/openai/v1/models on 2026-04-23.
-    // llama-3.1-70b-versatile was retired; use llama-3.3-70b-versatile.
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen/qwen3-32b"],
-    name: "groq",
-  },
-  {
-    url: "https://openrouter.ai/api/v1/chat/completions",
-    key: process.env.OPENROUTER_API_KEY!,
-    // Verified against https://openrouter.ai/api/v1/models on 2026-04-23.
-    // google/gemini-flash-1.5 was removed — replaced with gemini-2.0-flash-001.
-    // claude-3-5-haiku is the current active slug (3.5-sonnet retired; use
-    // claude-sonnet-4.5 if a stronger coder-tier fallback is needed).
-    models: [
-      "google/gemini-2.0-flash-001",
-      "anthropic/claude-3-5-haiku",
-      "anthropic/claude-sonnet-4.5",
-    ],
-    name: "openrouter",
-  },
-  {
-    // Google native generateContent API. Requires shape:"google" branch below.
-    // GOOGLE_AI_KEY is the canonical env var used by every other route in
-    // this repo; GEMINI_API_KEY kept as a legacy fallback.
-    url: "https://generativelanguage.googleapis.com/v1beta/models",
-    key: (process.env.GOOGLE_AI_KEY ?? process.env.GEMINI_API_KEY)!,
-    // Verified via v1beta/models ListModels on 2026-04-23. gemini-1.5-flash was
-    // removed from v1beta; gemini-flash-latest always resolves to the current
-    // recommended flash tier, gemini-2.5-flash is a stable fallback.
-    models: ["gemini-flash-latest", "gemini-2.5-flash"],
-    name: "gemini",
-    shape: "google",
-  },
-];
+const PROVIDERS = {
+  free: [
+    "minimax-m2.5-free",
+    "nemotron-3-super-free",
+    "hy3-preview-free",
+    "big-pickle",
+    "ling-2.6-flash",
+  ],
+  paid: [
+    "gpt-4o",
+    "claude-3-5-sonnet",
+    "deepseek-v3",
+  ]
+};
 
 // Models often emit "valid" multi-file JSON that still fails JSON.parse because
 // the file `content` values contain raw newlines / tabs / CRs instead of the
@@ -262,136 +210,107 @@ export function resolveImportPath(
   return null;
 }
 
-// Translate OpenAI-style messages into the Google generateContent `contents` shape.
-function toGoogleContents(messages: { role: string; content: string }[]) {
-  const systemText = messages
-    .filter((m) => m.role === "system")
-    .map((m) => m.content)
-    .join("\n\n");
-  const convo = messages
-    .filter((m) => m.role !== "system")
-    .map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
-  const body: Record<string, unknown> = { contents: convo };
-  if (systemText) body.systemInstruction = { parts: [{ text: systemText }] };
-  return body;
-}
-
 interface AIOptions {
-  temperature?: number
-  max_tokens?: number
+  temperature?: number;
+  max_tokens?: number;
+  freeOnly?: boolean;
+  preferModel?: string;
+  zenKey?: string;
 }
 
 export async function aiComplete(
   messages: { role: string; content: string }[],
   options?: AIOptions
 ): Promise<string> {
-  for (const provider of FALLBACK_PROVIDERS) {
-    if (!provider.key) continue
+  const zenKey = options?.zenKey || process.env.OPENCODE_ZEN_API_KEY;
+  if (!zenKey) throw new Error("Zen API key is missing");
 
-    for (const model of provider.models) {
-      try {
-        const isGoogle = provider.shape === "google";
-        const url = isGoogle
-          ? `${provider.url}/${model}:generateContent?key=${provider.key}`
-          : provider.url;
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (!isGoogle) headers["Authorization"] = `Bearer ${provider.key}`;
-        const body = isGoogle
-          ? {
-              ...toGoogleContents(messages),
-              generationConfig: {
-                temperature: options?.temperature ?? 0.7,
-                maxOutputTokens: options?.max_tokens ?? 2048,
-              },
-            }
-          : {
-              model,
-              messages,
-              temperature: options?.temperature ?? 0.7,
-              max_tokens: options?.max_tokens ?? 2048,
-            };
+  let models = options?.freeOnly ? PROVIDERS.free : [...PROVIDERS.paid, ...PROVIDERS.free];
+  if (options?.preferModel) {
+    models = [options.preferModel, ...models.filter(m => m !== options.preferModel)];
+  }
 
-        const res = await fetch(url, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(15000),
-        })
+  for (const model of models) {
+    try {
+      const res = await fetch(ZEN_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${zenKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: options?.temperature ?? 0.7,
+          max_tokens: options?.max_tokens ?? 2048,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
 
-        if (!res.ok) {
-          console.warn(`[${provider.name}/${model}] failed: ${res.status}`)
-          continue
-        }
-
-        const data = await res.json()
-        const content = isGoogle
-          ? data.candidates?.[0]?.content?.parts?.[0]?.text
-          : data.choices?.[0]?.message?.content;
-        if (!content) continue;
-        return content as string;
-      } catch (err) {
-        console.warn(`[${provider.name}/${model}] error:`, err)
-        continue
+      if (!res.ok) {
+        console.warn(`[Zen/${model}] failed: ${res.status}`);
+        continue;
       }
+
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (content) return content as string;
+    } catch (err) {
+      console.warn(`[Zen/${model}] error:`, err);
+      continue;
     }
   }
 
-  throw new Error("All AI providers failed")
+  throw new Error("All Zen models failed");
 }
 
 export async function aiCompleteStream(
   messages: { role: string; content: string }[],
   options?: AIOptions
 ): Promise<ReadableStream> {
-  for (const provider of FALLBACK_PROVIDERS) {
-    if (!provider.key) continue
-    // The Google provider streams via a different protocol (SSE on
-    // :streamGenerateContent). Since all existing callers expect an
-    // OpenAI-compat SSE body, skip Google here and fall through to the
-    // OpenAI-compat providers for streaming only.
-    if (provider.shape === "google") continue
+  const zenKey = options?.zenKey || process.env.OPENCODE_ZEN_API_KEY;
+  if (!zenKey) throw new Error("Zen API key is missing");
 
-    for (const model of provider.models) {
-      try {
-        const res = await fetch(provider.url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${provider.key}`
-          },
-          body: JSON.stringify({
-            model,
-            messages,
-            temperature: options?.temperature ?? 0.7,
-            max_tokens: options?.max_tokens ?? 2048,
-            stream: true
-          }),
-          signal: AbortSignal.timeout(15000)
-        })
+  let models = options?.freeOnly ? PROVIDERS.free : [...PROVIDERS.paid, ...PROVIDERS.free];
+  if (options?.preferModel) {
+    models = [options.preferModel, ...models.filter(m => m !== options.preferModel)];
+  }
 
-        if (!res.ok) continue
-        if (!res.body) continue
+  for (const model of models) {
+    try {
+      const res = await fetch(ZEN_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${zenKey}`
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: options?.temperature ?? 0.7,
+          max_tokens: options?.max_tokens ?? 2048,
+          stream: true
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
 
-        return res.body
-      } catch (err) {
-        console.warn(`[${provider.name}/${model}] stream error:`, err)
-        continue
-      }
+      if (!res.ok) continue;
+      if (!res.body) continue;
+
+      return res.body;
+    } catch (err) {
+      console.warn(`[Zen/${model}] stream error:`, err);
+      continue;
     }
   }
 
-  throw new Error("All AI providers failed")
+  throw new Error("All Zen models failed");
 }
 
 // ─── AGENT CONFIG & PROMPTS ──────────────────────────────────────────────────
 
 export interface AgentConfig {
-  groqKey: string;
-  openRouterKey: string;
-  googleAIKey: string;
+  zenKey: string;
   supabaseUrl: string;
   supabaseKey: string;
 }
@@ -783,49 +702,30 @@ Return ONLY the raw JSON object. No conversational filler.
 // ─── ORCHESTRATOR CLASS ──────────────────────────────────────────────────────
 
 export class NexusOrchestrator {
-  private groq: Groq;
+  private zenKey: string;
   private supabase: any;
-  private openRouterKey: string;
-  private googleAIKey: string;
 
   constructor(config: AgentConfig) {
-    this.groq = new Groq({ apiKey: config.groqKey });
+    this.zenKey = config.zenKey;
     this.supabase = createClient(config.supabaseUrl, config.supabaseKey);
-    this.openRouterKey = config.openRouterKey;
-    this.googleAIKey = config.googleAIKey;
   }
 
   /**
-   * Primary AI completion: free-first fallback chain → Groq SDK last resort.
-   * Replaces direct callGroq for all agent steps.
+   * Primary AI completion: Unified Zen engine.
    */
-  private async callAI(messages: { role: string; content: string }[], fallbackModel = 'llama-3.3-70b-versatile'): Promise<string> {
-    try {
-      return await aiComplete(messages);
-    } catch {
-      // All fetch-based providers failed — last resort: Groq SDK
-      return this.callGroqSDK(fallbackModel, messages);
-    }
+  private async callAI(messages: { role: string; content: string }[], preferModel?: string): Promise<string> {
+    return await aiComplete(messages, { zenKey: this.zenKey, preferModel });
   }
 
   /**
-   * Last-resort Groq SDK call (kept as fallback only).
-   */
-  private async callGroqSDK(model: string, messages: any[]) {
-    const response = await this.groq.chat.completions.create({ model, messages });
-    return response.choices[0]?.message?.content || '';
-  }
-
-  /**
-   * Multi-Agent Execution Pipeline (Enhanced with Vision)
-   * 1. Vision (Gemini 2.0 Flash) -> Visual Analysis (Optional)
-   * 2. Reasoner (Qwen3-32B) -> Logic / Chain of Thought
-   * 3. Orchestrator (Llama-70B) -> Plan / Tool Selection
-   * 4. Coder (Llama-8B) -> Execution / Code Generation
-   * 5. Linter (Llama-70B) -> Quality Assurance
-   * 6. Tester -> Generates Vitest suites for the final code
-   * 7. Executor -> AST-lite validates tester imports; retries Coder once on failure
-   * 8. Reviewer (Claude Sonnet 4.5 via OpenRouter) -> Functional review against plan
+   * Multi-Agent Execution Pipeline
+   * 1. Reasoner -> Logic / Chain of Thought
+   * 2. Orchestrator -> Plan / Tool Selection
+   * 3. Coder -> Execution / Code Generation
+   * 4. Linter -> Quality Assurance
+   * 5. Tester -> Generates Vitest suites for the final code
+   * 6. Executor -> AST-lite validates tester imports; retries Coder once on failure
+   * 7. Reviewer (Zen Paid Tier) -> Functional review against plan
    */
   async executeJob(jobId: string, options?: { isUnthrottled?: boolean }) {
     try {
@@ -880,21 +780,12 @@ export class NexusOrchestrator {
         await this.logEvent(jobId, 'system', 'status', 'PRIORITY COMPUTE QUEUE ACTIVE (Faster Models)');
       }
 
-      let visualAnalysis = '';
-      
-      // STEP 0: VISION ANALYSIS (Gemini 2.0 Flash)
-      if (job.image_url) {
-        await this.logEvent(jobId, 'gemini-2.0-flash', 'thought', 'Analyzing screenshot with Gemini Vision...');
-        visualAnalysis = await this.callGeminiVision(job.image_url, job.prompt);
-        await this.logEvent(jobId, 'gemini-2.0-flash', 'completion', visualAnalysis);
-      }
-
-      // STEP 1: REASONING (free-first chain, Groq SDK fallback)
+      // STEP 1: REASONING (Zen Free/Paid Tier)
       await this.logEvent(jobId, 'reasoner', 'thought', 'Initializing deep reasoning...');
       const reasoning = await this.callAI([
-        { role: 'system', content: 'You are the Reasoner. Break down the user prompt and visual analysis into a logical architecture.' },
-        { role: 'user', content: `Prompt: ${job.prompt}\nVisual Analysis: ${visualAnalysis}` }
-      ], isPriority ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant');
+        { role: 'system', content: 'You are the Reasoner. Break down the user prompt into a logical architecture.' },
+        { role: 'user', content: `Prompt: ${job.prompt}` }
+      ], isPriority ? 'gpt-4o' : 'minimax-m2.5-free');
       await this.logEvent(jobId, 'reasoner', 'completion', reasoning);
 
       // STEP 2: ORCHESTRATION
@@ -902,7 +793,7 @@ export class NexusOrchestrator {
       const plan = await this.callAI([
         { role: 'system', content: 'You are the Orchestrator. Create a task list for the Coder agent.' },
         { role: 'user', content: `Reasoning: ${reasoning}\nPrompt: ${job.prompt}` }
-      ]);
+      ], isPriority ? 'claude-3-5-sonnet' : 'nemotron-3-super-free');
       await this.logEvent(jobId, 'orchestrator', 'completion', plan);
 
       // STEP 3: CODING - MULTI-FILE JSON
@@ -931,7 +822,7 @@ export class NexusOrchestrator {
       const coderResponse = await this.callAI([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Plan: ${plan}` }
-      ], isPriority ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant');
+      ], isPriority ? 'gpt-4o' : 'hy3-preview-free');
       
       // The Coder frequently returns a well-formed multi-file JSON object that
       // still fails JSON.parse because the `content` values embed raw newlines
@@ -952,7 +843,7 @@ export class NexusOrchestrator {
       const linterResponse = await this.callAI([
         { role: 'system', content: linterPrompt },
         { role: 'user', content: `Initial Code: ${JSON.stringify(initialCode)}\nPlan: ${plan}` }
-      ]);
+      ], isPriority ? 'gpt-4o' : 'big-pickle');
 
       // Same whitespace-in-string repair path as the Coder above.
       const parsedLinter = parseJsonLoose<{ files?: { path: string; content: string }[] }>(linterResponse);
@@ -1013,7 +904,7 @@ export class NexusOrchestrator {
               { role: "system", content: systemPrompt },
               { role: "user", content: `Plan: ${retryPlan}` },
             ],
-            isPriority ? "llama-3.3-70b-versatile" : "llama-3.1-8b-instant",
+            isPriority ? "gpt-4o" : "hy3-preview-free",
           );
           const retryCoderParsed = parseJsonLoose<{ files?: { path: string; content: string }[] }>(
             retryCoderResponse,
@@ -1070,7 +961,7 @@ export class NexusOrchestrator {
       // FINAL: COMPLETE
       await this.supabase.from('agent_jobs').update({
         status: 'completed',
-        result: { reasoning, plan, code: finalCode, visualAnalysis, mockTestResults },
+        result: { reasoning, plan, code: finalCode, mockTestResults },
         test_results: testResults,
         review_results: reviewResults,
       }).eq('id', jobId);
@@ -1306,13 +1197,6 @@ export class NexusOrchestrator {
 
   /**
    * Functional review of the completed build against the original plan.
-   *
-   * Runs AFTER the Executor. Uses claude-sonnet-4.5 on OpenRouter directly
-   * (not the Groq fallback chain) because we want the strongest available
-   * reasoner for the "does this match the plan?" question. Non-blocking:
-   * any failure is logged as a reviewer event and returned as a
-   * ReviewResults with severity='info' and an `error` field populated —
-   * never throws out of the method.
    */
   private async runReviewerAgent(
     jobId: string,
@@ -1334,7 +1218,7 @@ export class NexusOrchestrator {
       issues: [],
       suggestions: '',
       severity: 'info',
-      reviewer: 'claude-sonnet-4.5',
+      reviewer: 'zen-paid-tier',
       error: reason,
     });
 
@@ -1344,23 +1228,6 @@ export class NexusOrchestrator {
         return null;
       }
 
-      // Use the constructor-injected key (set from config.openRouterKey at
-      // line 793), not process.env directly — matches the callGeminiVision
-      // pattern and makes the class testable with a different key.
-      const apiKey = this.openRouterKey;
-      if (!apiKey || apiKey === 'undefined') {
-        await safeLog('error', 'openRouterKey is not configured — skipping reviewer.');
-        return fallback('openRouterKey missing');
-      }
-
-      // Strip test files from the payload. By the time we get here,
-      // finalCode.files has been mutated to include the Tester-generated
-      // tests merged alongside source (see the two merge sites in
-      // executeJob). The REVIEWER_SYSTEM_PROMPT tells the model it's
-      // looking at "source files produced by the Coder + Linter" — sending
-      // tests would both waste tokens against the 2000-token budget and
-      // let the reviewer count test-file assertions/mocks as
-      // implementations of the planned features.
       const testPaths = new Set(
         (code as { tests?: { path: string }[] }).tests?.map((t) => t.path) ?? [],
       );
@@ -1373,7 +1240,7 @@ export class NexusOrchestrator {
 
       await safeLog(
         'thought',
-        `Reviewing ${sourceOnly.length} source file(s) against the plan with claude-sonnet-4.5...`,
+        `Reviewing ${sourceOnly.length} source file(s) against the plan with Zen Paid Tier...`,
       );
 
       const userPayload = {
@@ -1384,43 +1251,11 @@ export class NexusOrchestrator {
           : null,
       };
 
-      // AbortSignal.timeout keeps the fetch from hanging past the Vercel
-      // serverless execution limit. Without it, an unresponsive OpenRouter
-      // would kill the process before our outer try/catch runs, leaving
-      // the job stuck at status='running' because neither the
-      // status='completed' update nor the status='failed' catch handler
-      // get a chance to execute. 30s is ~2x the observed p99 for
-      // claude-sonnet-4.5 reviews at max_tokens:2000.
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'anthropic/claude-sonnet-4.5',
-          messages: [
-            { role: 'system', content: REVIEWER_SYSTEM_PROMPT },
-            { role: 'user', content: JSON.stringify(userPayload) },
-          ],
-          temperature: 0.2,
-          // Same budget constraint as /api/reviews — claude-sonnet-4.5
-          // on OpenRouter free tier 402s above ~2k output tokens.
-          max_tokens: 2000,
-          response_format: { type: 'json_object' },
-        }),
-        signal: AbortSignal.timeout(30000),
-      });
+      const content = await this.callAI([
+        { role: 'system', content: REVIEWER_SYSTEM_PROMPT },
+        { role: 'user', content: JSON.stringify(userPayload) },
+      ], 'claude-3-5-sonnet');
 
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        const reason = `openrouter ${res.status}: ${body.slice(0, 200)}`;
-        await safeLog('error', `Reviewer upstream failed: ${reason}`);
-        return fallback(reason);
-      }
-
-      const data = await res.json();
-      const content: string = data?.choices?.[0]?.message?.content ?? '';
       if (!content.trim()) {
         await safeLog('error', 'Reviewer returned an empty response body.');
         return fallback('empty response');
@@ -1434,6 +1269,7 @@ export class NexusOrchestrator {
         suggestions?: unknown;
         severity?: unknown;
       }>(cleaned);
+      
       if (!parsed) {
         await safeLog('error', `Reviewer returned unparseable JSON: ${cleaned.slice(0, 160)}`);
         return fallback('unparseable JSON');
@@ -1454,7 +1290,7 @@ export class NexusOrchestrator {
           : [],
         suggestions: typeof parsed.suggestions === 'string' ? parsed.suggestions : '',
         severity: isSeverity(parsed.severity) ? parsed.severity : 'info',
-        reviewer: 'claude-sonnet-4.5',
+        reviewer: 'zen-paid-tier',
       };
 
       const summaryParts = [
@@ -1469,37 +1305,6 @@ export class NexusOrchestrator {
       const message = err instanceof Error ? err.message : String(err);
       await safeLog('error', `Reviewer agent aborted: ${message}`);
       return fallback(message);
-    }
-  }
-
-  private async callGeminiVision(imageUrl: string, prompt: string) {
-    if (!this.googleAIKey || this.googleAIKey === 'undefined') {
-      throw new Error('Google AI Key is missing. Vision features are disabled.');
-    }
-    try {
-      if (!imageUrl || (!imageUrl.startsWith('data:image/') && imageUrl.length < 50)) {
-        throw new Error('Invalid image format. Expected a base64 data URL.');
-      }
-
-      const base64Data = imageUrl.includes(',') ? imageUrl.split(',')[1] : imageUrl;
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.googleAIKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: `Analyze this screenshot and describe the UI layout, colors, and components in detail. Use this to help build the app described: ${prompt}` },
-              { inline_data: { mime_type: "image/png", data: base64Data } }
-            ]
-          }]
-        })
-      });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error.message || 'Gemini Vision API Error');
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Vision analysis returned empty result.';
-    } catch (e: any) {
-      throw new Error(`Vision Analysis Failed: ${e.message}`);
     }
   }
 

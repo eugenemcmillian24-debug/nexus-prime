@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
-import { Groq } from "groq-sdk";
+import { aiComplete } from "@/lib/ai";
 import { isNexusPrimeAdmin } from "@/lib/nexus_prime_access";
 import { errorResponse } from "@/lib/apiError";
 
@@ -37,9 +37,6 @@ export async function POST(req: Request) {
     const { parentJobId, refinementPrompt, currentCode } =
       RefineSchema.parse({ ...body, userId: user.id });
 
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
-
-
     // Verify user owns the parent job
     const { data: parentJob } = await supabase
       .from("agent_jobs")
@@ -71,18 +68,13 @@ export async function POST(req: Request) {
     }
 
     // Call refinement agent
-    const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: REFINE_SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `Current Code:\n${currentCode}\n\nRefinement Request: ${refinementPrompt}`,
-        },
-      ],
-    });
-
-    const rawOutput = response.choices[0]?.message?.content || "";
+    const rawOutput = await aiComplete([
+      { role: "system", content: REFINE_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `Current Code:\n${currentCode}\n\nRefinement Request: ${refinementPrompt}`,
+      },
+    ], { preferModel: "llama-3.3-70b-versatile" });
 
     let refinedCode;
     try {
