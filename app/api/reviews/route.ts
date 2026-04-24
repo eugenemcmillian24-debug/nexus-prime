@@ -124,7 +124,12 @@ Respond ONLY with valid JSON in this exact format:
             { role: "user", content: `File: ${filePath}\nLanguage: ${language || "unknown"}\n\n\`\`\`\n${code}\n\`\`\`` },
           ],
           temperature: 0.3,
-          max_tokens: 4096,
+          // claude-sonnet-4.5 on OpenRouter bills ~1 credit per output token; a
+          // 4096-token review costs more than the free allowance most accounts
+          // have, and the provider then 402's the entire request. 2000 is
+          // enough to cover a typical review response (usually < 1200 tokens)
+          // and keeps the call within the default free-tier budget.
+          max_tokens: 2000,
           // Same reason as the Gemini branch: claude-sonnet-4.5 by default
           // returns ```json ... ``` wrapped in prose, which after the fence
           // strip parses to a plain object missing the expected keys.
