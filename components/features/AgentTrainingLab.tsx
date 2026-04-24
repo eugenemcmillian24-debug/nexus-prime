@@ -95,8 +95,15 @@ export default function AgentTrainingLab() {
   };
 
   const fetchPurchases = async () => {
-    // This would fetch from marketplace_purchases table
-    // For now, we'll assume an empty list or implement the API if needed
+    try {
+      const res = await fetch("/api/marketplace/purchases");
+      if (res.ok) {
+        const data = await res.json();
+        setPurchasedModuleIds(data.purchasedModuleIds || []);
+      }
+    } catch (error) {
+      // console.error("Failed to fetch purchases:", error);
+    }
   };
 
   const handlePurchase = async (moduleId: string) => {
@@ -309,13 +316,17 @@ export default function AgentTrainingLab() {
                 <p style={{ margin: "0 0 16px 0", fontSize: "11px", color: "#888", height: "33px", overflow: "hidden" }}>{module.description}</p>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: "12px", color: "#00ff88", fontWeight: "bold" }}>{module.price} CR</span>
-                  <button 
-                    onClick={() => handlePurchase(module.id)}
-                    disabled={isLoading}
-                    style={{ background: "#00ff88", color: "black", border: "none", padding: "6px 16px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold", cursor: "pointer" }}
-                  >
-                    {isLoading ? "..." : "GET NOW"}
-                  </button>
+                  {purchasedModuleIds.includes(module.id) ? (
+                    <span style={{ fontSize: "10px", color: "#00ff88", fontWeight: "bold", background: "#00ff8822", padding: "4px 8px", borderRadius: "4px" }}>OWNED</span>
+                  ) : (
+                    <button 
+                      onClick={() => handlePurchase(module.id)}
+                      disabled={isLoading}
+                      style={{ background: "#00ff88", color: "black", border: "none", padding: "6px 16px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold", cursor: "pointer" }}
+                    >
+                      {isLoading ? "..." : "GET NOW"}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -355,13 +366,17 @@ export default function AgentTrainingLab() {
                     }} style={{ background: "none", border: "none", color: "#ff4444", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}>DELETE</button>
                   </>
                 ) : (
-                  <button 
-                    onClick={() => handlePurchase(module.id)}
-                    disabled={isLoading}
-                    style={{ background: "#00ff88", color: "black", border: "none", padding: "4px 12px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold", cursor: "pointer" }}
-                  >
-                    {isLoading ? "..." : "PURCHASE ACCESS"}
-                  </button>
+                  purchasedModuleIds.includes(module.id) ? (
+                    <span style={{ fontSize: "10px", color: "#00ff88", fontWeight: "bold", background: "#00ff8822", padding: "4px 12px", borderRadius: "4px" }}>OWNED</span>
+                  ) : (
+                    <button 
+                      onClick={() => handlePurchase(module.id)}
+                      disabled={isLoading}
+                      style={{ background: "#00ff88", color: "black", border: "none", padding: "4px 12px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold", cursor: "pointer" }}
+                    >
+                      {isLoading ? "..." : "PURCHASE ACCESS"}
+                    </button>
+                  )
                 )}
               </div>
             </div>
