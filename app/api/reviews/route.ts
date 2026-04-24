@@ -87,8 +87,11 @@ Respond ONLY with valid JSON in this exact format:
           response_format: { type: "json_object" },
         }),
       });
+      if (!res.ok) {
+        throw new UpstreamReviewError(await readUpstreamError(res, "groq"), res.status);
+      }
       const data = await res.json();
-      aiResponse = data.choices?.[0]?.message?.content || "{}";
+      aiResponse = data.choices?.[0]?.message?.content ?? "";
     } else if (modelConfig === "gemini") {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GOOGLE_AI_KEY}`,
@@ -108,8 +111,11 @@ Respond ONLY with valid JSON in this exact format:
           }),
         }
       );
+      if (!res.ok) {
+        throw new UpstreamReviewError(await readUpstreamError(res, "gemini"), res.status);
+      }
       const data = await res.json();
-      aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     } else {
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -136,16 +142,44 @@ Respond ONLY with valid JSON in this exact format:
           response_format: { type: "json_object" },
         }),
       });
+      if (!res.ok) {
+        throw new UpstreamReviewError(await readUpstreamError(res, "openrouter"), res.status);
+      }
       const data = await res.json();
-      aiResponse = data.choices?.[0]?.message?.content || "{}";
+      aiResponse = data.choices?.[0]?.message?.content ?? "";
+    }
+
+    if (!aiResponse || !aiResponse.trim()) {
+      throw new UpstreamReviewError(`${modelConfig} returned an empty response body`, 502);
     }
 
     // Parse AI response
     const cleanJson = aiResponse.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    const parsed = JSON.parse(cleanJson);
+    let parsed: { summary?: unknown; score?: unknown; findings?: unknown };
+    try {
+      parsed = JSON.parse(cleanJson);
+    } catch {
+      throw new UpstreamReviewError(`${modelConfig} returned unparseable JSON: ${cleanJson.slice(0, 200)}`, 502);
+    }
+
+    const hasSummary = typeof parsed.summary === "string" && parsed.summary.trim().length > 0;
+    const hasScore = typeof parsed.score === "number";
+    const hasFindings = Array.isArray(parsed.findings) && parsed.findings.length > 0;
+
+    // When upstream succeeds with real content we always see at least one of
+    // {summary, score, findings[]}. All three missing means the provider
+    // returned a placeholder (empty object, schema-mismatched prose, etc.)
+    // and writing defaults here would mask the failure as a 'completed' row
+    // indistinguishable from a real clean review.
+    if (!hasSummary && !hasScore && !hasFindings) {
+      throw new UpstreamReviewError(
+        `${modelConfig} returned a response with no summary/score/findings`,
+        502,
+      );
+    }
 
     // Add IDs to findings
-    const findings = (parsed.findings || []).map((f: Record<string, unknown>, i: number) => ({
+    const findings = (hasFindings ? (parsed.findings as Record<string, unknown>[]) : []).map((f, i) => ({
       ...f,
       id: `finding-${review.id}-${i}`,
     }));
@@ -155,8 +189,8 @@ Respond ONLY with valid JSON in this exact format:
       .from("code_reviews")
       .update({
         findings,
-        summary: parsed.summary || "Review completed",
-        score: Math.min(100, Math.max(0, parsed.score || 0)),
+        summary: hasSummary ? (parsed.summary as string) : "Review completed",
+        score: Math.min(100, Math.max(0, hasScore ? (parsed.score as number) : 0)),
         status: "completed",
         completed_at: new Date().toISOString(),
       })
@@ -180,9 +214,60 @@ Respond ONLY with valid JSON in this exact format:
       completedAt: updated.completed_at,
     });
   } catch (error) {
-    // Mark review as failed
-    await supabase.from("code_reviews").update({ status: "failed" }).eq("id", review.id);
-    return NextResponse.json({ error: "Review failed" }, { status: 500 });
+    const isUpstream = error instanceof UpstreamReviewError;
+    const message = isUpstream
+      ? error.message
+      : error instanceof Error
+        ? error.message
+        : "Review failed";
+
+    // Mark review as failed — and stash the upstream reason so the UI can
+    // show the user *why* instead of a generic "Review completed" row with
+    // empty findings.
+    await supabase
+      .from("code_reviews")
+      .update({
+        status: "failed",
+        summary: `Review failed: ${message}`.slice(0, 500),
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", review.id);
+
+    const status = isUpstream ? 502 : 500;
+    return NextResponse.json(
+      { error: "Review failed", detail: message, reviewId: review.id },
+      { status },
+    );
+  }
+}
+
+class UpstreamReviewError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "UpstreamReviewError";
+    this.status = status;
+  }
+}
+
+async function readUpstreamError(res: Response, provider: string): Promise<string> {
+  try {
+    const body = await res.text();
+    // Providers typically return JSON with {error: {message: "..."}} or a
+    // plain string. Try to extract the most useful field without exploding
+    // on malformed payloads.
+    try {
+      const parsed = JSON.parse(body) as { error?: { message?: string } | string; message?: string };
+      const inner = typeof parsed.error === "string" ? parsed.error : parsed.error?.message;
+      const top = typeof parsed.message === "string" ? parsed.message : undefined;
+      const extracted = inner || top;
+      if (extracted) return `${provider} ${res.status}: ${extracted}`;
+    } catch {
+      /* fall through to raw body */
+    }
+    return `${provider} ${res.status}: ${body.slice(0, 200)}`;
+  } catch {
+    return `${provider} ${res.status}`;
   }
 }
 
