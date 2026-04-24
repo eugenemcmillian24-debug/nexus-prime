@@ -592,19 +592,21 @@ export class NexusOrchestrator {
 
       let customSystemPrompt = '';
       if (job.training_module_id) {
-        const { data: mod } = await this.supabase
+        const { data: mod, error: modErr } = await this.supabase
           .from('agent_training_modules')
           .select('system_prompt')
           .eq('id', job.training_module_id)
           .maybeSingle();
+        if (modErr) throw new Error(`Failed to load agent_training_modules ${job.training_module_id}: ${modErr.message}`);
         customSystemPrompt = mod?.system_prompt || '';
       }
 
-      const { data: creditsRow } = await this.supabase
+      const { data: creditsRow, error: creditsErr } = await this.supabase
         .from('user_credits')
         .select('agency_mode, agency_config, tier')
         .eq('user_id', job.user_id)
         .maybeSingle();
+      if (creditsErr) throw new Error(`Failed to load user_credits for user ${job.user_id}: ${creditsErr.message}`);
 
       const isUnthrottled = options?.isUnthrottled || process.env.NEXUS_UNTHROTTLED_BUILD === 'true';
       const isAgencyMode = creditsRow?.agency_mode || false;
