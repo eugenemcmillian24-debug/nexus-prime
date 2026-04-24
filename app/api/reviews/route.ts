@@ -97,7 +97,14 @@ Respond ONLY with valid JSON in this exact format:
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: `${systemPrompt}\n\nFile: ${filePath}\nLanguage: ${language || "unknown"}\n\n\`\`\`\n${code}\n\`\`\`` }] }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 4096,
+              // Force JSON output so the downstream JSON.parse at line 129
+              // sees the expected {summary, score, findings[]} shape rather
+              // than prose+fences (which parses but drops fields to defaults).
+              responseMimeType: "application/json",
+            },
           }),
         }
       );
@@ -118,6 +125,10 @@ Respond ONLY with valid JSON in this exact format:
           ],
           temperature: 0.3,
           max_tokens: 4096,
+          // Same reason as the Gemini branch: claude-sonnet-4.5 by default
+          // returns ```json ... ``` wrapped in prose, which after the fence
+          // strip parses to a plain object missing the expected keys.
+          response_format: { type: "json_object" },
         }),
       });
       const data = await res.json();
