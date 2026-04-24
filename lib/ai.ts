@@ -130,6 +130,121 @@ function parseJsonLoose<T = unknown>(raw: string): T | null {
   }
 }
 
+// ---- Executor helpers (AST-lite test validation) ------------------------
+// These are deliberately regex-based rather than using a real TS parser.
+// A Vercel serverless function is not a great place to instantiate
+// tsc/Babel, and the generated code we're inspecting is always small,
+// freshly-generated, and unlikely to exploit edge cases of the parser.
+
+export type TestResults = {
+  passed: { path: string; imports_valid: boolean }[];
+  failed: { path: string; reason: string; missing_symbols: string[] }[];
+  retry_count: number;
+  executor: "ast-imports";
+};
+
+export function extractImports(
+  source: string,
+): { symbols: string[]; source: string }[] {
+  const out: { symbols: string[]; source: string }[] = [];
+
+  // import { a, b as c } from './foo'
+  const namedRe = /import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/g;
+  let m: RegExpExecArray | null;
+  while ((m = namedRe.exec(source))) {
+    const symbols = m[1]
+      .split(",")
+      .map((s) => s.trim().split(/\s+as\s+/)[0].trim())
+      .filter(Boolean);
+    out.push({ symbols, source: m[2] });
+  }
+
+  // import Foo from './foo' (default import)
+  const defaultRe = /import\s+(\w+)\s+from\s+['"]([^'"]+)['"]/g;
+  while ((m = defaultRe.exec(source))) {
+    out.push({ symbols: ["default"], source: m[2] });
+  }
+
+  // import * as Foo from './foo'
+  const starRe = /import\s*\*\s*as\s+(\w+)\s+from\s+['"]([^'"]+)['"]/g;
+  while ((m = starRe.exec(source))) {
+    out.push({ symbols: ["*"], source: m[2] });
+  }
+
+  return out;
+}
+
+export function extractExports(source: string): Set<string> {
+  const out = new Set<string>();
+
+  // export const|let|var|function|class|async function|type|interface|enum NAME
+  const declRe =
+    /export\s+(?:async\s+)?(?:const|let|var|function|class|type|interface|enum)\s+(\w+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = declRe.exec(source))) {
+    out.add(m[1]);
+  }
+
+  // export { a, b as c }
+  const blockRe = /export\s*\{([^}]+)\}/g;
+  while ((m = blockRe.exec(source))) {
+    for (const raw of m[1].split(",")) {
+      const name = raw.trim().split(/\s+as\s+/).pop()?.trim();
+      if (name) out.add(name);
+    }
+  }
+
+  // export default ...
+  if (/export\s+default\s+/.test(source)) {
+    out.add("default");
+  }
+
+  return out;
+}
+
+export function resolveImportPath(
+  fromPath: string,
+  importSpec: string,
+  files: { path: string; content: string }[],
+): { path: string; content: string } | null {
+  // Build a normalized candidate path list for lookup. We don't have a
+  // real module resolver, so we brute-force a few common extensions /
+  // index-file patterns.
+  const stripExt = (p: string) => p.replace(/\.(tsx?|jsx?|mjs|cjs)$/, "");
+  const byStripped = new Map<string, { path: string; content: string }>();
+  for (const f of files) {
+    byStripped.set(stripExt(f.path), f);
+  }
+
+  let target: string;
+  if (importSpec.startsWith("@/")) {
+    target = importSpec.slice(2);
+  } else {
+    // Resolve './foo' or '../foo' relative to fromPath's directory.
+    const fromDir = fromPath.split("/").slice(0, -1);
+    const specParts = importSpec.split("/");
+    const stack = [...fromDir];
+    for (const part of specParts) {
+      if (part === "" || part === ".") continue;
+      if (part === "..") stack.pop();
+      else stack.push(part);
+    }
+    target = stack.join("/");
+  }
+
+  const normalized = stripExt(target);
+
+  // Direct hit.
+  const direct = byStripped.get(normalized);
+  if (direct) return direct;
+
+  // Barrel: `./foo` resolving to `./foo/index.ts`.
+  const barrel = byStripped.get(`${normalized}/index`);
+  if (barrel) return barrel;
+
+  return null;
+}
+
 // Translate OpenAI-style messages into the Google generateContent `contents` shape.
 function toGoogleContents(messages: { role: string; content: string }[]) {
   const systemText = messages
@@ -799,10 +914,7 @@ export class NexusOrchestrator {
 
       // STEP 5: TESTING - GENERATE VITEST SUITES
       // Non-blocking: failure here never marks the whole build failed.
-      // Tests are appended to finalCode.files so they ride the same
-      // auto-sync path as source files. A follow-up PR will add an
-      // executor that actually runs the generated tests.
-      const testerFiles = await this.runTesterAgent(jobId, finalCode, plan);
+      let testerFiles = await this.runTesterAgent(jobId, finalCode, plan);
       if (testerFiles.length > 0) {
         finalCode = {
           ...finalCode,
@@ -811,10 +923,95 @@ export class NexusOrchestrator {
         };
       }
 
+      // STEP 6: EXECUTE - VALIDATE GENERATED TESTS (AST-LITE IMPORT CHECK)
+      // We don't actually `vitest run` here — a Vercel serverless function
+      // has no way to install the generated app's own deps or stand up a
+      // real test runner. Instead we do the most valuable cheap check:
+      // parse each generated test, walk its imports, and verify every
+      // imported symbol actually exists as an export in the source files.
+      // Catches the #1 Tester failure mode: "imports a symbol that doesn't
+      // exist because the Coder renamed/dropped it." Non-blocking.
+      let testResults = await this.runTestExecutor(jobId, finalCode, testerFiles);
+
+      // STEP 7: RETRY ONCE IF EXECUTOR FOUND IMPORT FAILURES
+      // Bounded to 1 retry to avoid doubling build time / credit burn.
+      // The retry re-runs Coder+Linter+Tester+Executor with the previous
+      // failure messages appended to the plan so the Coder knows exactly
+      // which missing exports to add. If the retry still has failures we
+      // record them in test_results and ship the build anyway — the user
+      // at least gets the source files and a clear record of what broke.
+      const MAX_RETRIES = 1;
+      if (testResults.failed.length > 0) {
+        const retryContext = testResults.failed
+          .map((f) => `- ${f.path}: ${f.reason}`)
+          .join("\n");
+        await this.logEvent(
+          jobId,
+          "test-executor",
+          "thought",
+          `Retry 1/${MAX_RETRIES}: re-running Coder with ${testResults.failed.length} test failure(s) as context.`,
+        );
+
+        const retryPlan = `${plan}\n\nPREVIOUS BUILD FAILED TESTS:\n${retryContext}\n\nFix the missing exports so the generated tests can import them. Keep all prior files; only add or adjust what's needed.`;
+
+        try {
+          const retryCoderResponse = await this.callAI(
+            [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: `Plan: ${retryPlan}` },
+            ],
+            isPriority ? "llama-3.3-70b-versatile" : "llama-3.1-8b-instant",
+          );
+          const retryCoderParsed = parseJsonLoose<{ files?: { path: string; content: string }[] }>(
+            retryCoderResponse,
+          );
+          if (retryCoderParsed?.files && Array.isArray(retryCoderParsed.files)) {
+            initialCode = retryCoderParsed;
+            await this.logEvent(
+              jobId,
+              "coder",
+              "completion",
+              `Retry: regenerated ${initialCode.files?.length || 0} files`,
+            );
+
+            const retryLinterResponse = await this.callAI([
+              { role: "system", content: LINTER_SYSTEM_PROMPT },
+              {
+                role: "user",
+                content: `Initial Code: ${JSON.stringify(initialCode)}\nPlan: ${retryPlan}`,
+              },
+            ]);
+            const retryLinterParsed = parseJsonLoose<{ files?: { path: string; content: string }[] }>(
+              retryLinterResponse,
+            );
+            finalCode =
+              retryLinterParsed?.files && Array.isArray(retryLinterParsed.files)
+                ? retryLinterParsed
+                : initialCode;
+
+            testerFiles = await this.runTesterAgent(jobId, finalCode, retryPlan);
+            if (testerFiles.length > 0) {
+              finalCode = {
+                ...finalCode,
+                files: [...(finalCode.files || []), ...testerFiles],
+                tests: testerFiles,
+              };
+            }
+
+            testResults = await this.runTestExecutor(jobId, finalCode, testerFiles);
+            testResults.retry_count = 1;
+          }
+        } catch (retryErr) {
+          const msg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+          await this.logEvent(jobId, "test-executor", "error", `Retry failed: ${msg}`);
+        }
+      }
+
       // FINAL: COMPLETE
       await this.supabase.from('agent_jobs').update({
         status: 'completed',
-        result: { reasoning, plan, code: finalCode, visualAnalysis }
+        result: { reasoning, plan, code: finalCode, visualAnalysis },
+        test_results: testResults,
       }).eq('id', jobId);
 
       // Auto-sync AI-generated code into project files
@@ -933,6 +1130,116 @@ export class NexusOrchestrator {
       await this.logEvent(jobId, 'tester', 'error', `Tester agent failed: ${message}`);
       return [];
     }
+  }
+
+  /**
+   * AST-lite validation of Tester-generated tests. For each test file:
+   *   1. Extract the `import { a, b, c } from '...'` statements.
+   *   2. Resolve the import path to one of the Coder-produced source files.
+   *   3. Extract the set of exported symbols from that source file.
+   *   4. Verify every imported symbol is actually exported.
+   *
+   * Returns a structured TestResults shape suitable for persisting to
+   * agent_jobs.test_results. Never throws — any parse failure is
+   * recorded as a failed test with reason='executor could not analyze'.
+   */
+  private async runTestExecutor(
+    jobId: string,
+    code: { files?: { path: string; content: string }[] },
+    tests: { path: string; content: string }[],
+  ): Promise<TestResults> {
+    const empty: TestResults = {
+      passed: [],
+      failed: [],
+      retry_count: 0,
+      executor: 'ast-imports',
+    };
+
+    if (!tests || tests.length === 0) {
+      await this.logEvent(
+        jobId,
+        'test-executor',
+        'thought',
+        'No generated tests to validate. Skipping executor.',
+      );
+      return empty;
+    }
+
+    await this.logEvent(
+      jobId,
+      'test-executor',
+      'thought',
+      `Validating imports for ${tests.length} generated test file(s)...`,
+    );
+
+    const sourceFiles = code.files || [];
+    const results: TestResults = { ...empty };
+
+    for (const test of tests) {
+      try {
+        const imports = extractImports(test.content);
+        const missing: { symbol: string; source: string }[] = [];
+
+        for (const imp of imports) {
+          // Path-alias / node_modules imports we cannot analyze. Skip them
+          // — vitest, react, @testing-library etc. would always "fail"
+          // this check and pollute the output.
+          if (!imp.source.startsWith('./') && !imp.source.startsWith('../') && !imp.source.startsWith('@/')) {
+            continue;
+          }
+          const resolved = resolveImportPath(test.path, imp.source, sourceFiles);
+          if (!resolved) {
+            for (const sym of imp.symbols) {
+              missing.push({ symbol: sym, source: imp.source });
+            }
+            continue;
+          }
+          const exported = extractExports(resolved.content);
+          for (const sym of imp.symbols) {
+            if (sym === 'default' || sym === '*') continue;
+            if (!exported.has(sym)) {
+              missing.push({ symbol: sym, source: imp.source });
+            }
+          }
+        }
+
+        if (missing.length === 0) {
+          results.passed.push({ path: test.path, imports_valid: true });
+        } else {
+          const bySource = new Map<string, string[]>();
+          for (const m of missing) {
+            bySource.set(m.source, [...(bySource.get(m.source) || []), m.symbol]);
+          }
+          const reasonParts: string[] = [];
+          for (const [src, syms] of bySource) {
+            reasonParts.push(`imports [${syms.join(', ')}] from '${src}' but ${syms.length === 1 ? 'no such export found' : 'those exports do not exist'}`);
+          }
+          results.failed.push({
+            path: test.path,
+            reason: reasonParts.join('; '),
+            missing_symbols: missing.map((m) => m.symbol),
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        results.failed.push({
+          path: test.path,
+          reason: `executor could not analyze: ${message}`,
+          missing_symbols: [],
+        });
+      }
+    }
+
+    await this.logEvent(
+      jobId,
+      'test-executor',
+      results.failed.length === 0 ? 'completion' : 'error',
+      results.failed.length === 0
+        ? `All ${results.passed.length} test file(s) have valid imports.`
+        : `${results.failed.length} of ${tests.length} test file(s) have broken imports: ${results.failed.map((f) => f.path).join(', ')}`,
+    );
+
+    return results;
   }
 
   private async callGeminiVision(imageUrl: string, prompt: string) {
