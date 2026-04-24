@@ -152,9 +152,12 @@ export function extractImports(
   const namedRe = /import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/g;
   let m: RegExpExecArray | null;
   while ((m = namedRe.exec(source))) {
+    // Strip TypeScript inline `type` modifier (`import { type Foo, bar }`)
+    // before splitting on `as`, otherwise the recorded symbol is literally
+    // "type Foo" and will never match any export.
     const symbols = m[1]
       .split(",")
-      .map((s) => s.trim().split(/\s+as\s+/)[0].trim())
+      .map((s) => s.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim())
       .filter(Boolean);
     out.push({ symbols, source: m[2] });
   }
@@ -1155,25 +1158,35 @@ export class NexusOrchestrator {
       executor: 'ast-imports',
     };
 
-    if (!tests || tests.length === 0) {
-      await this.logEvent(
-        jobId,
+    // Helper that swallows logEvent failures. A transient Supabase outage
+    // here must not propagate up and fail the whole build — the Executor
+    // is explicitly non-blocking.
+    const safeLog = async (agent: string, type: string, content: string) => {
+      try {
+        await this.logEvent(jobId, agent, type, content);
+      } catch {
+        /* intentionally ignore */
+      }
+    };
+
+    try {
+      if (!tests || tests.length === 0) {
+        await safeLog(
+          'test-executor',
+          'thought',
+          'No generated tests to validate. Skipping executor.',
+        );
+        return empty;
+      }
+
+      await safeLog(
         'test-executor',
         'thought',
-        'No generated tests to validate. Skipping executor.',
+        `Validating imports for ${tests.length} generated test file(s)...`,
       );
-      return empty;
-    }
 
-    await this.logEvent(
-      jobId,
-      'test-executor',
-      'thought',
-      `Validating imports for ${tests.length} generated test file(s)...`,
-    );
-
-    const sourceFiles = code.files || [];
-    const results: TestResults = { ...empty };
+      const sourceFiles = code.files || [];
+      const results: TestResults = { ...empty };
 
     for (const test of tests) {
       try {
@@ -1230,16 +1243,20 @@ export class NexusOrchestrator {
       }
     }
 
-    await this.logEvent(
-      jobId,
-      'test-executor',
-      results.failed.length === 0 ? 'completion' : 'error',
-      results.failed.length === 0
-        ? `All ${results.passed.length} test file(s) have valid imports.`
-        : `${results.failed.length} of ${tests.length} test file(s) have broken imports: ${results.failed.map((f) => f.path).join(', ')}`,
-    );
+      await safeLog(
+        'test-executor',
+        results.failed.length === 0 ? 'completion' : 'error',
+        results.failed.length === 0
+          ? `All ${results.passed.length} test file(s) have valid imports.`
+          : `${results.failed.length} of ${tests.length} test file(s) have broken imports: ${results.failed.map((f) => f.path).join(', ')}`,
+      );
 
-    return results;
+      return results;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await safeLog('test-executor', 'error', `Executor aborted: ${message}`);
+      return empty;
+    }
   }
 
   private async callGeminiVision(imageUrl: string, prompt: string) {
