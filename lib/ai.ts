@@ -1348,20 +1348,41 @@ export class NexusOrchestrator {
         return null;
       }
 
-      const apiKey = process.env.OPENROUTER_API_KEY;
-      if (!apiKey) {
-        await safeLog('error', 'OPENROUTER_API_KEY is not set — skipping reviewer.');
-        return fallback('OPENROUTER_API_KEY missing');
+      // Use the constructor-injected key (set from config.openRouterKey at
+      // line 793), not process.env directly — matches the callGeminiVision
+      // pattern and makes the class testable with a different key.
+      const apiKey = this.openRouterKey;
+      if (!apiKey || apiKey === 'undefined') {
+        await safeLog('error', 'openRouterKey is not configured — skipping reviewer.');
+        return fallback('openRouterKey missing');
+      }
+
+      // Strip test files from the payload. By the time we get here,
+      // finalCode.files has been mutated to include the Tester-generated
+      // tests merged alongside source (see the two merge sites in
+      // executeJob). The REVIEWER_SYSTEM_PROMPT tells the model it's
+      // looking at "source files produced by the Coder + Linter" — sending
+      // tests would both waste tokens against the 2000-token budget and
+      // let the reviewer count test-file assertions/mocks as
+      // implementations of the planned features.
+      const testPaths = new Set(
+        (code as { tests?: { path: string }[] }).tests?.map((t) => t.path) ?? [],
+      );
+      const sourceOnly = code.files.filter((f) => !testPaths.has(f.path));
+
+      if (sourceOnly.length === 0) {
+        await safeLog('thought', 'No non-test source files to review. Skipping reviewer.');
+        return null;
       }
 
       await safeLog(
         'thought',
-        `Reviewing ${code.files.length} file(s) against the plan with claude-sonnet-4.5...`,
+        `Reviewing ${sourceOnly.length} source file(s) against the plan with claude-sonnet-4.5...`,
       );
 
       const userPayload = {
         plan,
-        files: code.files.map((f) => ({ path: f.path, content: f.content })),
+        files: sourceOnly.map((f) => ({ path: f.path, content: f.content })),
         test_results: testResults
           ? { passed: testResults.passed.length, failed: testResults.failed }
           : null,
