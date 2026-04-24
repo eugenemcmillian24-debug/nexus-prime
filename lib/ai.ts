@@ -243,6 +243,27 @@ RULES:
 If the code is already perfect, return the original JSON unchanged.
 `.trim();
 
+const TESTER_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Tester Agent. You generate focused Vitest unit tests for the code the Coder just produced.
+STACK: Vitest, @testing-library/react (for components), @testing-library/jest-dom.
+
+INPUTS:
+1. The full set of source files (path + content).
+2. The original build plan.
+
+RULES:
+1. GENERATE ONE TEST FILE per testable source file. Testable = exports any function, hook, class, util, or React component. SKIP pure style/layout files (e.g. app/globals.css, tailwind.config.*), config files, and pages whose behavior is entirely JSX layout with no interactivity.
+2. TEST PATHS: place every test next to its source under __tests__/ or as .test.ts(x). Example: 'lib/math.ts' -> '__tests__/lib/math.test.ts'. 'components/Counter.tsx' -> '__tests__/components/Counter.test.tsx'.
+3. FOCUS: one happy-path test and one meaningful edge case per exported symbol. Do NOT write trivial "renders without crashing" assertions.
+4. IMPORT USING PATH ALIAS if the codebase uses one; otherwise use relative paths from the test file.
+5. DO NOT MOCK EVERYTHING — only mock external side-effects (fetch, file system, DB). Pure functions should be called directly.
+6. USE @testing-library/react for component tests with 'render', 'screen', 'fireEvent'. Assert on visible output / role / text, not internal state.
+7. STRUCTURE: Return ONLY a raw JSON object with the generated test files:
+   { "tests": [ { "path": "string", "content": "string" } ] }
+   - If nothing is testable in the provided files, return { "tests": [] }.
+8. OUTPUT: Return ONLY the JSON. No prose, no markdown fences.
+`.trim();
+
 const DEVOPS_SYSTEM_PROMPT = `
 You are the NEXUS PRIME DevOps Agent. Your specialty is diagnosing and fixing build/deployment failures.
 STACK: Next.js 14 (App Router), TypeScript, Vercel.
@@ -723,6 +744,20 @@ export class NexusOrchestrator {
       }
       await this.logEvent(jobId, 'linter', 'completion', 'Quality assurance complete. Code is ready.');
 
+      // STEP 5: TESTING - GENERATE VITEST SUITES
+      // Non-blocking: failure here never marks the whole build failed.
+      // Tests are appended to finalCode.files so they ride the same
+      // auto-sync path as source files. A follow-up PR will add an
+      // executor that actually runs the generated tests.
+      const testerFiles = await this.runTesterAgent(jobId, finalCode, plan);
+      if (testerFiles.length > 0) {
+        finalCode = {
+          ...finalCode,
+          files: [...(finalCode.files || []), ...testerFiles],
+          tests: testerFiles,
+        };
+      }
+
       // FINAL: COMPLETE
       await this.supabase.from('agent_jobs').update({
         status: 'completed',
@@ -753,6 +788,99 @@ export class NexusOrchestrator {
     } catch (err: any) {
       await this.logEvent(jobId, 'system', 'error', err.message);
       await this.supabase.from('agent_jobs').update({ status: 'failed', error: err.message }).eq('id', jobId);
+    }
+  }
+
+  /**
+   * Generate Vitest test files for the finalized code.
+   *
+   * Returns an array of test files ready to be merged into finalCode.files.
+   * Any failure (upstream AI error, unparseable JSON, wrong shape) is
+   * logged as a tester event but does NOT throw — we never want a test
+   * generation hiccup to blow away a successful build.
+   */
+  private async runTesterAgent(
+    jobId: string,
+    code: { files?: { path: string; content: string }[] },
+    plan: string,
+  ): Promise<{ path: string; content: string }[]> {
+    try {
+      if (!code?.files || code.files.length === 0) {
+        await this.logEvent(jobId, 'tester', 'thought', 'No source files to test. Skipping tester agent.');
+        return [];
+      }
+
+      await this.logEvent(
+        jobId,
+        'tester',
+        'thought',
+        `Generating Vitest suites for ${code.files.length} source file(s)...`,
+      );
+
+      const testerResponse = await this.callAI([
+        { role: 'system', content: TESTER_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: `Plan: ${plan}\n\nSource Files:\n${JSON.stringify(code.files)}`,
+        },
+      ]);
+
+      // Tester prompt returns { tests: [...] }. Be tolerant of prose
+      // wrappers or fence blocks and fall back to the Coder-style
+      // { files: [...] } shape if the model gets cute.
+      let parsed: { tests?: unknown; files?: unknown } = {};
+      try {
+        const jsonMatch = testerResponse.match(/\{[\s\S]*\}/);
+        const jsonString = jsonMatch ? jsonMatch[0] : testerResponse;
+        parsed = JSON.parse(jsonString);
+      } catch {
+        await this.logEvent(
+          jobId,
+          'tester',
+          'error',
+          'Tester returned unparseable JSON. Tests skipped for this build.',
+        );
+        return [];
+      }
+
+      const rawTests = Array.isArray(parsed.tests)
+        ? parsed.tests
+        : Array.isArray(parsed.files)
+          ? parsed.files
+          : [];
+
+      const tests = rawTests
+        .filter(
+          (t): t is { path: string; content: string } =>
+            !!t &&
+            typeof (t as { path?: unknown }).path === 'string' &&
+            typeof (t as { content?: unknown }).content === 'string',
+        )
+        .filter((t) => t.content.trim().length > 0)
+        .map((t) => ({
+          path: t.path.startsWith('__tests__/') || /\.(test|spec)\.[tj]sx?$/.test(t.path)
+            ? t.path
+            : // Normalize anything the model returned that doesn't look
+              // like a test path — put it under __tests__/ next to its
+              // original directory to keep the project tree tidy.
+              `__tests__/${t.path.replace(/\.(tsx?|jsx?)$/, '.test.$1')}`,
+          content: t.content,
+        }));
+
+      await this.logEvent(
+        jobId,
+        'tester',
+        'completion',
+        tests.length === 0
+          ? 'Tester agent found nothing testable in this build.'
+          : `Generated ${tests.length} test file(s): ${tests.map((t) => t.path).join(', ')}`,
+      );
+
+      return tests;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await this.logEvent(jobId, 'tester', 'error', `Tester agent failed: ${message}`);
+      return [];
     }
   }
 
