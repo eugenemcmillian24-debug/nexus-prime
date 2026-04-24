@@ -576,22 +576,44 @@ export class NexusOrchestrator {
    * 5. Linter (Llama-70B) -> Quality Assurance
    */
   async executeJob(jobId: string, options?: { isUnthrottled?: boolean }) {
-    const { data: job } = await this.supabase
-      .from('agent_jobs')
-      .select('*, agent_training_modules(system_prompt), user_credits(agency_mode, agency_config, tier)')
-      .eq('id', jobId)
-      .single();
-    
-    if (!job) return;
-
-    const isUnthrottled = options?.isUnthrottled || process.env.NEXUS_UNTHROTTLED_BUILD === 'true';
-    const customSystemPrompt = job.agent_training_modules?.system_prompt || '';
-    const isAgencyMode = job.user_credits?.agency_mode || false;
-    const agencyConfig = job.user_credits?.agency_config || {};
-    const userTier = job.user_credits?.tier || 'Free';
-    const isPriority = (TIER_LIMITS as any)[userTier]?.priorityCompute || false;
-
     try {
+      // Fetch the job itself. Split related lookups into separate queries to
+      // avoid PostgREST embed ambiguity (user_credits.user_id and
+      // agent_jobs.user_id both reference auth.users, so there is no direct
+      // FK between the two public tables — embedding them can fail at runtime
+      // and previously caused silent drops with `if (!job) return;`).
+      const { data: job, error: jobErr } = await this.supabase
+        .from('agent_jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single();
+      if (jobErr) throw new Error(`Failed to load agent_job ${jobId}: ${jobErr.message}`);
+      if (!job) throw new Error(`agent_job ${jobId} not found`);
+
+      let customSystemPrompt = '';
+      if (job.training_module_id) {
+        const { data: mod, error: modErr } = await this.supabase
+          .from('agent_training_modules')
+          .select('system_prompt')
+          .eq('id', job.training_module_id)
+          .maybeSingle();
+        if (modErr) throw new Error(`Failed to load agent_training_modules ${job.training_module_id}: ${modErr.message}`);
+        customSystemPrompt = mod?.system_prompt || '';
+      }
+
+      const { data: creditsRow, error: creditsErr } = await this.supabase
+        .from('user_credits')
+        .select('agency_mode, agency_config, tier')
+        .eq('user_id', job.user_id)
+        .maybeSingle();
+      if (creditsErr) throw new Error(`Failed to load user_credits for user ${job.user_id}: ${creditsErr.message}`);
+
+      const isUnthrottled = options?.isUnthrottled || process.env.NEXUS_UNTHROTTLED_BUILD === 'true';
+      const isAgencyMode = creditsRow?.agency_mode || false;
+      const agencyConfig = creditsRow?.agency_config || {};
+      const userTier = creditsRow?.tier || 'Free';
+      const isPriority = (TIER_LIMITS as any)[userTier]?.priorityCompute || false;
+
       await this.supabase.from('agent_jobs').update({ status: 'running' }).eq('id', jobId);
 
       if (isUnthrottled) {
