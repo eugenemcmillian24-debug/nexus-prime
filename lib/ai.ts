@@ -1367,6 +1367,13 @@ export class NexusOrchestrator {
           : null,
       };
 
+      // AbortSignal.timeout keeps the fetch from hanging past the Vercel
+      // serverless execution limit. Without it, an unresponsive OpenRouter
+      // would kill the process before our outer try/catch runs, leaving
+      // the job stuck at status='running' because neither the
+      // status='completed' update nor the status='failed' catch handler
+      // get a chance to execute. 30s is ~2x the observed p99 for
+      // claude-sonnet-4.5 reviews at max_tokens:2000.
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -1385,6 +1392,7 @@ export class NexusOrchestrator {
           max_tokens: 2000,
           response_format: { type: 'json_object' },
         }),
+        signal: AbortSignal.timeout(30000),
       });
 
       if (!res.ok) {
