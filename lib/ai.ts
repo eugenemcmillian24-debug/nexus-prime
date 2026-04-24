@@ -73,6 +73,63 @@ const FALLBACK_PROVIDERS: Provider[] = [
   },
 ];
 
+// Models often emit "valid" multi-file JSON that still fails JSON.parse because
+// the file `content` values contain raw newlines / tabs / CRs instead of the
+// escaped `\n` / `\t` / `\r` that the JSON spec requires inside string literals.
+// This helper walks the text once and escapes those raw whitespace characters
+// only when we're inside a string. We keep it deliberately small — it does NOT
+// try to be a full JSON5 / jsonc fallback, just handles the one failure mode
+// we actually observe from Groq/OpenRouter responses.
+function repairJsonStrings(s: string): string {
+  let out = "";
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escape) {
+      out += c;
+      escape = false;
+      continue;
+    }
+    if (c === "\\" && inString) {
+      out += c;
+      escape = true;
+      continue;
+    }
+    if (c === '"') {
+      inString = !inString;
+      out += c;
+      continue;
+    }
+    if (inString) {
+      if (c === "\n") out += "\\n";
+      else if (c === "\r") out += "\\r";
+      else if (c === "\t") out += "\\t";
+      else out += c;
+    } else {
+      out += c;
+    }
+  }
+  return out;
+}
+
+// Wrap JSON.parse with two tries: raw parse, then a parse of the
+// whitespace-repaired string. Returns `null` if both fail so callers can
+// decide between fallback shapes without having to re-catch.
+function parseJsonLoose<T = unknown>(raw: string): T | null {
+  const match = raw.match(/\{[\s\S]*\}/);
+  const candidate = match ? match[0] : raw;
+  try {
+    return JSON.parse(candidate) as T;
+  } catch {
+    try {
+      return JSON.parse(repairJsonStrings(candidate)) as T;
+    } catch {
+      return null;
+    }
+  }
+}
+
 // Translate OpenAI-style messages into the Google generateContent `contents` shape.
 function toGoogleContents(messages: { role: string; content: string }[]) {
   const systemText = messages
@@ -711,15 +768,16 @@ export class NexusOrchestrator {
         { role: 'user', content: `Plan: ${plan}` }
       ], isPriority ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant');
       
+      // The Coder frequently returns a well-formed multi-file JSON object that
+      // still fails JSON.parse because the `content` values embed raw newlines
+      // / tabs instead of escaped `\n` / `\t`. parseJsonLoose tries a repair
+      // pass before we give up and collapse the whole response into a single
+      // `app/page.tsx` file.
+      const parsedCoder = parseJsonLoose<{ files?: { path: string; content: string }[] }>(coderResponse);
       let initialCode;
-      try {
-        const jsonMatch = coderResponse.match(/\{[\s\S]*\}/);
-        const jsonString = jsonMatch ? jsonMatch[0] : coderResponse;
-        initialCode = JSON.parse(jsonString);
-        if (!initialCode?.files || !Array.isArray(initialCode.files)) {
-          throw new Error('Invalid JSON structure');
-        }
-      } catch (e) {
+      if (parsedCoder?.files && Array.isArray(parsedCoder.files)) {
+        initialCode = parsedCoder;
+      } else {
         initialCode = { files: [{ path: "app/page.tsx", content: coderResponse.replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*/g, '').replace(/```/g, '')).trim() }] };
       }
       await this.logEvent(jobId, 'coder', 'completion', `Generated ${initialCode.files?.length || 1} files`);
@@ -731,17 +789,12 @@ export class NexusOrchestrator {
         { role: 'user', content: `Initial Code: ${JSON.stringify(initialCode)}\nPlan: ${plan}` }
       ]);
 
-      let finalCode;
-      try {
-        const jsonMatch = linterResponse.match(/\{[\s\S]*\}/);
-        const jsonString = jsonMatch ? jsonMatch[0] : linterResponse;
-        finalCode = JSON.parse(jsonString);
-        if (!finalCode?.files || !Array.isArray(finalCode.files)) {
-          finalCode = initialCode;
-        }
-      } catch (e) {
-        finalCode = initialCode;
-      }
+      // Same whitespace-in-string repair path as the Coder above.
+      const parsedLinter = parseJsonLoose<{ files?: { path: string; content: string }[] }>(linterResponse);
+      const finalCodeFromLinter =
+        parsedLinter?.files && Array.isArray(parsedLinter.files) ? parsedLinter : null;
+      let finalCode: { files?: { path: string; content: string }[]; tests?: { path: string; content: string }[] } =
+        finalCodeFromLinter ?? initialCode;
       await this.logEvent(jobId, 'linter', 'completion', 'Quality assurance complete. Code is ready.');
 
       // STEP 5: TESTING - GENERATE VITEST SUITES
@@ -828,12 +881,10 @@ export class NexusOrchestrator {
       // Tester prompt returns { tests: [...] }. Be tolerant of prose
       // wrappers or fence blocks and fall back to the Coder-style
       // { files: [...] } shape if the model gets cute.
-      let parsed: { tests?: unknown; files?: unknown } = {};
-      try {
-        const jsonMatch = testerResponse.match(/\{[\s\S]*\}/);
-        const jsonString = jsonMatch ? jsonMatch[0] : testerResponse;
-        parsed = JSON.parse(jsonString);
-      } catch {
+      // parseJsonLoose repairs unescaped raw newlines inside string values,
+      // which is how the model most often corrupts this response.
+      const parsed = parseJsonLoose<{ tests?: unknown; files?: unknown }>(testerResponse);
+      if (!parsed) {
         await this.logEvent(
           jobId,
           'tester',
