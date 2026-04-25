@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/api';
 import { errorResponse } from "@/lib/apiError";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/marketplace/purchases - Fetch user's purchased blueprints
 export async function GET(req: Request) {
   try {

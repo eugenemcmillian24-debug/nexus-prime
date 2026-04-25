@@ -5,6 +5,8 @@ import { errorResponse } from "@/lib/apiError";
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
 const PROJECT_ID = process.env.VERCEL_PROJECT_ID;
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     const isAdmin = await isNexusPrimeAdmin();
