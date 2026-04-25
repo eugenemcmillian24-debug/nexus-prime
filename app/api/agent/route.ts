@@ -7,6 +7,7 @@ import { waitUntil } from '@vercel/functions';
 import { isNexusPrimeAdmin, TIER_LIMITS, PREMIUM_AGENTS } from '@/lib/nexus_prime_access';
 import { errorResponse } from '@/lib/apiError';
 
+export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 min max for orchestrator pipeline
 
 export async function POST(req: Request) {

@@ -9,16 +9,19 @@ const ZEN_ENDPOINT = "https://opencode.ai/zen/v1/chat/completions";
 
 const PROVIDERS = {
   free: [
-    "minimax-m2.5-free",
-    "nemotron-3-super-free",
-    "hy3-preview-free",
-    "big-pickle",
-    "ling-2.6-flash",
+    "minimax-m2.5",
+    "minimax-m2.7",
+    "qwen-3.5",
+    "qwen-3.6",
+    "kimi-k2.5",
+    "kimi-k2.6",
   ],
   paid: [
-    "gpt-4o",
-    "claude-3-5-sonnet",
-    "deepseek-v3",
+    "glm-5",
+    "glm-5.1",
+    "mimo-v2",
+    "mimo-v2.5",
+    "deepseek-v4",
   ]
 };
 
@@ -812,7 +815,7 @@ export class NexusOrchestrator {
       const reasoning = await this.callAI([
         { role: 'system', content: 'You are the Reasoner. Break down the user prompt into a logical architecture.' },
         { role: 'user', content: `Prompt: ${job.prompt}${existingFilesContext}` }
-      ], isPriority ? 'gpt-4o' : 'minimax-m2.5-free');
+      ], isPriority ? 'deepseek-v4' : 'minimax-m2.5');
       await this.logEvent(jobId, 'reasoner', 'completion', reasoning);
 
       // Intermediate status update to keep connection alive and persist progress
@@ -824,8 +827,8 @@ export class NexusOrchestrator {
       await this.logEvent(jobId, 'orchestrator', 'thought', 'Generating execution plan based on reasoning...');
       const plan = await this.callAI([
         { role: 'system', content: 'You are the Orchestrator. Create a task list for the Coder agent.' },
-        { role: 'user', content: `Reasoning: ${reasoning}\nPrompt: ${job.prompt}` }
-      ], isPriority ? 'claude-3-5-sonnet' : 'nemotron-3-super-free');
+        { role: 'user', content: `Reasoning: ${reasoning}\nPrompt: ${job.prompt}${existingFilesContext}` }
+      ], isPriority ? 'glm-5.1' : 'qwen-3.6');
       await this.logEvent(jobId, 'orchestrator', 'completion', plan);
 
       // Persist plan
@@ -876,7 +879,7 @@ RULES:
             ? `Current Code Context:\n${existingFilesContext}\n\nRefinement Request: ${job.prompt}`
             : `Plan: ${plan}${existingFilesContext}` 
         }
-      ], isPriority ? 'gpt-4o' : 'hy3-preview-free');
+      ], isPriority ? 'deepseek-v4' : 'minimax-m2.7');
       
       // The Coder frequently returns a well-formed multi-file JSON object that
       // still fails JSON.parse because the `content` values embed raw newlines
@@ -902,7 +905,7 @@ RULES:
       const linterResponse = await this.callAI([
         { role: 'system', content: linterPrompt },
         { role: 'user', content: `Initial Code: ${JSON.stringify(initialCode)}\nPlan: ${plan}\nContext: ${existingFilesContext}` }
-      ], isPriority ? 'gpt-4o' : 'big-pickle');
+      ], isPriority ? 'glm-5' : 'kimi-k2.6');
 
       // Same whitespace-in-string repair path as the Coder above.
       const parsedLinter = parseJsonLoose<{ files?: { path: string; content: string }[] }>(linterResponse);
@@ -973,7 +976,7 @@ RULES:
               { role: "system", content: systemPrompt },
               { role: "user", content: `Plan: ${retryPlan}` },
             ],
-            isPriority ? "gpt-4o" : "hy3-preview-free",
+            isPriority ? "deepseek-v4" : "minimax-m2.7",
           );
           const retryCoderParsed = parseJsonLoose<{ files?: { path: string; content: string }[] }>(
             retryCoderResponse,
@@ -1315,7 +1318,7 @@ RULES:
       const content = await this.callAI([
         { role: 'system', content: REVIEWER_SYSTEM_PROMPT },
         { role: 'user', content: JSON.stringify(userPayload) },
-      ], 'claude-3-5-sonnet');
+      ], 'deepseek-v4');
 
       if (!content.trim()) {
         await safeLog('error', 'Reviewer returned an empty response body.');
@@ -1379,7 +1382,7 @@ RULES:
   }
 
   private async upsertProjectFiles(projectId: string, files: { path: string; content: string }[]) {
-    for (const file of files) {
+    const records = files.map(file => {
       const ext = file.path.split(".").pop()?.toLowerCase();
       const langMap: Record<string, string> = {
         ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
@@ -1387,14 +1390,19 @@ RULES:
       };
       const language = langMap[ext || ""] || "plaintext";
 
-      await this.supabase.from('project_files').upsert({
+      return {
         project_id: projectId,
         path: file.path,
         content: file.content,
         language,
         size_bytes: Buffer.from(file.content || "").length,
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'project_id,path' });
+      };
+    });
+
+    if (records.length > 0) {
+      const { error } = await this.supabase.from('project_files').upsert(records, { onConflict: 'project_id,path' });
+      if (error) console.error("Error upserting project files:", error.message);
     }
   }
 
