@@ -230,6 +230,7 @@ export async function aiComplete(
     models = [options.preferModel, ...models.filter(m => m !== options.preferModel)];
   }
 
+  const errors: string[] = [];
   for (const model of models) {
     try {
       const res = await fetch(ZEN_ENDPOINT, {
@@ -244,24 +245,29 @@ export async function aiComplete(
           temperature: options?.temperature ?? 0.7,
           max_tokens: options?.max_tokens ?? 2048,
         }),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(60000),
       });
 
       if (!res.ok) {
-        console.warn(`[Zen/${model}] failed: ${res.status}`);
+        const errBody = await res.text().catch(() => "no-body");
+        const msg = `[Zen/${model}] failed (${res.status}): ${errBody}`;
+        console.warn(msg);
+        errors.push(msg);
         continue;
       }
 
       const data = await res.json();
       const content = data.choices?.[0]?.message?.content;
       if (content) return content as string;
-    } catch (err) {
-      console.warn(`[Zen/${model}] error:`, err);
+    } catch (err: any) {
+      const msg = `[Zen/${model}] error: ${err.message || String(err)}`;
+      console.warn(msg);
+      errors.push(msg);
       continue;
     }
   }
 
-  throw new Error("All Zen models failed");
+  throw new Error(`All Zen models failed. Details:\n${errors.join("\n")}`);
 }
 
 export async function aiCompleteStream(
@@ -276,6 +282,7 @@ export async function aiCompleteStream(
     models = [options.preferModel, ...models.filter(m => m !== options.preferModel)];
   }
 
+  const errors: string[] = [];
   for (const model of models) {
     try {
       const res = await fetch(ZEN_ENDPOINT, {
@@ -291,20 +298,33 @@ export async function aiCompleteStream(
           max_tokens: options?.max_tokens ?? 2048,
           stream: true
         }),
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.timeout(60000)
       });
 
-      if (!res.ok) continue;
-      if (!res.body) continue;
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "no-body");
+        const msg = `[Zen/${model}] stream failed (${res.status}): ${errBody}`;
+        console.warn(msg);
+        errors.push(msg);
+        continue;
+      }
+      if (!res.body) {
+        const msg = `[Zen/${model}] stream error: Empty response body`;
+        console.warn(msg);
+        errors.push(msg);
+        continue;
+      }
 
       return res.body;
-    } catch (err) {
-      console.warn(`[Zen/${model}] stream error:`, err);
+    } catch (err: any) {
+      const msg = `[Zen/${model}] stream error: ${err.message || String(err)}`;
+      console.warn(msg);
+      errors.push(msg);
       continue;
     }
   }
 
-  throw new Error("All Zen models failed");
+  throw new Error(`All Zen models failed (stream). Details:\n${errors.join("\n")}`);
 }
 
 // ─── AGENT CONFIG & PROMPTS ──────────────────────────────────────────────────

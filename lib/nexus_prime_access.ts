@@ -15,7 +15,13 @@ export async function isNexusPrimeAdmin() {
 
   if (!user) return false;
 
-  // 1. DATABASE CHECK (Primary Authority)
+  // 1. STRICT SUPERUSER OVERRIDE (Env Var - Highest Priority)
+  // This allows bootstrapping or emergency access without DB calls.
+  const adminAccess = process.env.ADMIN_ACCESS || '';
+  const superuserEmails = adminAccess.split(',').map(email => email.trim()).filter(Boolean);
+  if (superuserEmails.includes(user.email || '')) return true;
+
+  // 2. DATABASE CHECK (Primary Authority)
   const { data: credits } = await supabase
     .from('user_credits')
     .select('tier')
@@ -24,14 +30,8 @@ export async function isNexusPrimeAdmin() {
 
   if (credits?.tier === 'admin') return true;
 
-  // 2. METADATA FALLBACK
-  const isAdmin = user.app_metadata?.role === 'admin' || user.user_metadata?.is_admin === true;
-  if (isAdmin) return true;
-
-  // 3. STRICT SUPERUSER OVERRIDE (Legacy/Bootstrap)
-  const adminAccess = process.env.ADMIN_ACCESS || '';
-  const superuserEmails = adminAccess.split(',').map(email => email.trim()).filter(Boolean);
-  return superuserEmails.includes(user.email || '');
+  // 3. METADATA FALLBACK
+  return user.app_metadata?.role === 'admin' || user.user_metadata?.is_admin === true;
 }
 
 
