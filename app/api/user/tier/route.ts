@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/api';
 import { TIER_LIMITS } from '@/lib/nexus_prime_access';
 import { errorResponse } from '@/lib/apiError';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   try {
     const supabase = createClient();

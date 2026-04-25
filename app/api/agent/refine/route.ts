@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { z, ZodError } from "zod";
-import { aiComplete } from "@/lib/ai";
+import { NexusOrchestrator } from "@/lib/ai";
 import { isNexusPrimeAdmin } from "@/lib/nexus_prime_access";
 import { errorResponse } from "@/lib/apiError";
 import { waitUntil } from "@vercel/functions";
@@ -91,46 +91,13 @@ export async function POST(req: Request) {
     }
 
     // Background process using waitUntil
-    waitUntil((async () => {
-      try {
-        // Call refinement agent
-        const rawOutput = await aiComplete([
-          { role: "system", content: REFINE_SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: `Current Code:\n${currentCode}\n\nRefinement Request: ${refinementPrompt}`,
-          },
-        ], { preferModel: "llama-3.3-70b-versatile" });
+    const orchestrator = new NexusOrchestrator({
+      zenKey: process.env.OPENCODE_ZEN_API_KEY!,
+      supabaseUrl: (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)!,
+      supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    });
 
-        let refinedCode;
-        try {
-          const jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
-          refinedCode = JSON.parse(jsonMatch ? jsonMatch[0] : rawOutput);
-        } catch {
-          refinedCode = JSON.parse(currentCode);
-        }
-
-        // Update job with result
-        await supabase
-          .from("agent_jobs")
-          .update({
-            status: "completed",
-            result: {
-              code: refinedCode,
-              refinement: true,
-              parentJobId,
-            },
-          })
-          .eq("id", newJob.id);
-          
-      } catch (err) {
-        console.error("Background refinement error:", err);
-        await supabase
-          .from("agent_jobs")
-          .update({ status: "failed" })
-          .eq("id", newJob.id);
-      }
-    })());
+    waitUntil(orchestrator.executeJob(newJob.id, { isUnthrottled: isAdmin }));
 
     return NextResponse.json({
       jobId: newJob.id,

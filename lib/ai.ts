@@ -794,18 +794,6 @@ export class NexusOrchestrator {
 
       await this.supabase.from('agent_jobs').update({ status: 'running' }).eq('id', jobId);
 
-      if (isUnthrottled) {
-        await this.logEvent(jobId, 'system', 'status', 'UNTHROTTLED BUILD PIPELINE ACTIVE');
-      }
-
-      if (isAgencyMode) {
-        await this.logEvent(jobId, 'system', 'status', 'AGENCY WHITE-LABEL MODE ACTIVE');
-      }
-
-      if (isPriority) {
-        await this.logEvent(jobId, 'system', 'status', 'PRIORITY COMPUTE QUEUE ACTIVE (Faster Models)');
-      }
-
       // Fetch existing project files for context
       let existingFilesContext = '';
       if (job.project_id) {
@@ -827,6 +815,11 @@ export class NexusOrchestrator {
       ], isPriority ? 'gpt-4o' : 'minimax-m2.5-free');
       await this.logEvent(jobId, 'reasoner', 'completion', reasoning);
 
+      // Intermediate status update to keep connection alive and persist progress
+      await this.supabase.from('agent_jobs').update({ 
+        result: { reasoning } 
+      }).eq('id', jobId);
+
       // STEP 2: ORCHESTRATION
       await this.logEvent(jobId, 'orchestrator', 'thought', 'Generating execution plan based on reasoning...');
       const plan = await this.callAI([
@@ -835,6 +828,11 @@ export class NexusOrchestrator {
       ], isPriority ? 'claude-3-5-sonnet' : 'nemotron-3-super-free');
       await this.logEvent(jobId, 'orchestrator', 'completion', plan);
 
+      // Persist plan
+      await this.supabase.from('agent_jobs').update({ 
+        result: { reasoning, plan } 
+      }).eq('id', jobId);
+
       // STEP 3: CODING - MULTI-FILE JSON
       await this.logEvent(jobId, 'coder', 'thought', 'Writing multi-file code structure...');
       
@@ -842,10 +840,24 @@ export class NexusOrchestrator {
       let linterPrompt = LINTER_SYSTEM_PROMPT;
       let testerPrompt = TESTER_SYSTEM_PROMPT;
       
-      // Handle Premium Agents
-      if (job.agent_type === 'marketing-psy') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${MARKETING_PSY_SYSTEM_PROMPT}`;
-      if (job.agent_type === 'security-guru') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${SECURITY_GURU_SYSTEM_PROMPT}`;
-      if (job.agent_type === 'seo-architect') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${SEO_ARCHITECT_SYSTEM_PROMPT}`;
+      if (job.agent_type === 'refiner') {
+        systemPrompt = `
+You are the NEXUS PRIME Refinement Agent. You modify existing code based on user instructions.
+You receive the current code (JSON with files array) and a refinement request.
+
+RULES:
+1. ONLY modify what the user asks for. Do NOT rewrite unrelated code.
+2. Maintain the existing file structure. Add new files only if necessary.
+3. Return the COMPLETE updated files array as JSON: { "files": [...] }
+4. Keep all TypeScript types, imports, and existing functionality intact.
+5. OUTPUT: Return ONLY the raw JSON string. No markdown, no explanation.
+`.trim();
+      } else {
+        // Handle Premium Agents
+        if (job.agent_type === 'marketing-psy') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${MARKETING_PSY_SYSTEM_PROMPT}`;
+        if (job.agent_type === 'security-guru') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${SECURITY_GURU_SYSTEM_PROMPT}`;
+        if (job.agent_type === 'seo-architect') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${SEO_ARCHITECT_SYSTEM_PROMPT}`;
+      }
       
       // Apply Custom Training Module
       if (customSystemPrompt) {
@@ -860,7 +872,10 @@ export class NexusOrchestrator {
 
       const coderResponse = await this.callAI([
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Plan: ${plan}${existingFilesContext}` }
+        { role: 'user', content: job.agent_type === 'refiner' 
+            ? `Current Code Context:\n${existingFilesContext}\n\nRefinement Request: ${job.prompt}`
+            : `Plan: ${plan}${existingFilesContext}` 
+        }
       ], isPriority ? 'gpt-4o' : 'hy3-preview-free');
       
       // The Coder frequently returns a well-formed multi-file JSON object that
@@ -886,7 +901,7 @@ export class NexusOrchestrator {
       await this.logEvent(jobId, 'linter', 'thought', 'Reviewing code for syntax and type safety...');
       const linterResponse = await this.callAI([
         { role: 'system', content: linterPrompt },
-        { role: 'user', content: `Initial Code: ${JSON.stringify(initialCode)}\nPlan: ${plan}` }
+        { role: 'user', content: `Initial Code: ${JSON.stringify(initialCode)}\nPlan: ${plan}\nContext: ${existingFilesContext}` }
       ], isPriority ? 'gpt-4o' : 'big-pickle');
 
       // Same whitespace-in-string repair path as the Coder above.
@@ -901,6 +916,11 @@ export class NexusOrchestrator {
       if (job.project_id && finalCode.files) {
         await this.upsertProjectFiles(job.project_id, finalCode.files);
       }
+
+      // Update agent_jobs with partial finalCode
+      await this.supabase.from('agent_jobs').update({ 
+        result: { reasoning, plan, code: finalCode } 
+      }).eq('id', jobId);
 
       // STEP 5: TESTING - GENERATE VITEST SUITES
       // Non-blocking: failure here never marks the whole build failed.
@@ -981,6 +1001,14 @@ export class NexusOrchestrator {
               retryLinterParsed?.files && Array.isArray(retryLinterParsed.files)
                 ? retryLinterParsed
                 : initialCode;
+
+            if (job.project_id && finalCode.files) {
+              await this.upsertProjectFiles(job.project_id, finalCode.files);
+            }
+
+            await this.supabase.from('agent_jobs').update({ 
+              result: { reasoning, plan, code: finalCode } 
+            }).eq('id', jobId);
 
             testerFiles = await this.runTesterAgent(jobId, finalCode, retryPlan, testerPrompt);
             if (testerFiles.length > 0) {

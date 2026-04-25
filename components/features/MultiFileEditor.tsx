@@ -136,19 +136,23 @@ export default function MultiFileEditor({
     loadFiles();
   }, [projectId]);
 
-  // Auto-save & Change callback with debounce
+  // Immediate Change callback for preview
+  useEffect(() => {
+    if (onChange) {
+      onChange(files);
+    }
+  }, [files, onChange]);
+
+  // Separate Auto-save with debounce
   useEffect(() => {
     if (readOnly) return;
     const timer = setTimeout(() => {
       if (unsavedChanges.size > 0) {
         saveAllFiles();
       }
-      if (onChange) {
-        onChange(files);
-      }
     }, 1000);
     return () => clearTimeout(timer);
-  }, [unsavedChanges, files, onChange]);
+  }, [unsavedChanges, readOnly]);
 
   // Keyboard shortcut: Ctrl+S
   useEffect(() => {
