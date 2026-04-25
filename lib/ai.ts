@@ -806,11 +806,24 @@ export class NexusOrchestrator {
         await this.logEvent(jobId, 'system', 'status', 'PRIORITY COMPUTE QUEUE ACTIVE (Faster Models)');
       }
 
+      // Fetch existing project files for context
+      let existingFilesContext = '';
+      if (job.project_id) {
+        const { data: existingFiles } = await this.supabase
+          .from('project_files')
+          .select('path, content')
+          .eq('project_id', job.project_id);
+        
+        if (existingFiles && existingFiles.length > 0) {
+          existingFilesContext = `\n\nCURRENT PROJECT STATE (Iterative Chat):\n${existingFiles.map((f: any) => `File: ${f.path}\nContent:\n${f.content}`).join('\n\n---\n\n')}`;
+        }
+      }
+
       // STEP 1: REASONING (Zen Free/Paid Tier)
       await this.logEvent(jobId, 'reasoner', 'thought', 'Initializing deep reasoning...');
       const reasoning = await this.callAI([
         { role: 'system', content: 'You are the Reasoner. Break down the user prompt into a logical architecture.' },
-        { role: 'user', content: `Prompt: ${job.prompt}` }
+        { role: 'user', content: `Prompt: ${job.prompt}${existingFilesContext}` }
       ], isPriority ? 'gpt-4o' : 'minimax-m2.5-free');
       await this.logEvent(jobId, 'reasoner', 'completion', reasoning);
 
@@ -847,7 +860,7 @@ export class NexusOrchestrator {
 
       const coderResponse = await this.callAI([
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Plan: ${plan}` }
+        { role: 'user', content: `Plan: ${plan}${existingFilesContext}` }
       ], isPriority ? 'gpt-4o' : 'hy3-preview-free');
       
       // The Coder frequently returns a well-formed multi-file JSON object that
@@ -864,6 +877,11 @@ export class NexusOrchestrator {
       }
       await this.logEvent(jobId, 'coder', 'completion', `Generated ${initialCode.files?.length || 1} files`);
 
+      // Early persistence to survive Hobby timeouts
+      if (job.project_id && initialCode.files) {
+        await this.upsertProjectFiles(job.project_id, initialCode.files);
+      }
+
       // STEP 4: LINTING - QUALITY ASSURANCE
       await this.logEvent(jobId, 'linter', 'thought', 'Reviewing code for syntax and type safety...');
       const linterResponse = await this.callAI([
@@ -878,6 +896,11 @@ export class NexusOrchestrator {
       let finalCode: { files?: { path: string; content: string }[]; tests?: { path: string; content: string }[] } =
         finalCodeFromLinter ?? initialCode;
       await this.logEvent(jobId, 'linter', 'completion', 'Quality assurance complete. Code is ready.');
+
+      // Persistent Linter refinements
+      if (job.project_id && finalCode.files) {
+        await this.upsertProjectFiles(job.project_id, finalCode.files);
+      }
 
       // STEP 5: TESTING - GENERATE VITEST SUITES
       // Non-blocking: failure here never marks the whole build failed.
@@ -992,25 +1015,9 @@ export class NexusOrchestrator {
         review_results: reviewResults,
       }).eq('id', jobId);
 
-      // Auto-sync AI-generated code into project files
+      // Auto-sync AI-generated code into project files (Final pass for tests/refinements)
       if (job.project_id && finalCode?.files) {
-        for (const file of finalCode.files) {
-          const ext = file.path.split(".").pop()?.toLowerCase();
-          const langMap: Record<string, string> = {
-            ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-            css: "css", scss: "scss", html: "html", json: "json", md: "markdown", sql: "sql",
-          };
-          const language = langMap[ext || ""] || "plaintext";
-
-          await this.supabase.from('project_files').upsert({
-            project_id: job.project_id,
-            path: file.path,
-            content: file.content,
-            language,
-            size_bytes: Buffer.from(file.content || "").length,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'project_id,path' });
-        }
+        await this.upsertProjectFiles(job.project_id, finalCode.files);
       }
 
     } catch (err: any) {
@@ -1341,6 +1348,26 @@ export class NexusOrchestrator {
       event_type: eventType,
       content,
     });
+  }
+
+  private async upsertProjectFiles(projectId: string, files: { path: string; content: string }[]) {
+    for (const file of files) {
+      const ext = file.path.split(".").pop()?.toLowerCase();
+      const langMap: Record<string, string> = {
+        ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+        css: "css", scss: "scss", html: "html", json: "json", md: "markdown", sql: "sql",
+      };
+      const language = langMap[ext || ""] || "plaintext";
+
+      await this.supabase.from('project_files').upsert({
+        project_id: projectId,
+        path: file.path,
+        content: file.content,
+        language,
+        size_bytes: Buffer.from(file.content || "").length,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'project_id,path' });
+    }
   }
 
   async transcribe(file: File | Blob) {
