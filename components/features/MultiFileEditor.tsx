@@ -34,6 +34,7 @@ interface MultiFileEditorProps {
   onFileSelect?: (id: string) => void;
   onFileClose?: (id: string) => void;
   onFileSave?: (id: string, content: string) => Promise<void>;
+  onChange?: (files: ProjectFile[]) => void;
 }
 
 const DEFAULT_FILES: ProjectFile[] = [
@@ -79,6 +80,7 @@ export default function MultiFileEditor({
   onBuild,
   onVersionCreated,
   readOnly = false,
+  onChange,
 }: MultiFileEditorProps) {
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [openTabs, setOpenTabs] = useState<string[]>([]);
@@ -134,12 +136,19 @@ export default function MultiFileEditor({
     loadFiles();
   }, [projectId]);
 
-  // Auto-save with debounce
+  // Auto-save & Change callback with debounce
   useEffect(() => {
-    if (unsavedChanges.size === 0 || readOnly) return;
-    const timer = setTimeout(() => saveAllFiles(), 2000);
+    if (readOnly) return;
+    const timer = setTimeout(() => {
+      if (unsavedChanges.size > 0) {
+        saveAllFiles();
+      }
+      if (onChange) {
+        onChange(files);
+      }
+    }, 1000);
     return () => clearTimeout(timer);
-  }, [unsavedChanges]);
+  }, [unsavedChanges, files, onChange]);
 
   // Keyboard shortcut: Ctrl+S
   useEffect(() => {
@@ -154,19 +163,20 @@ export default function MultiFileEditor({
   }, [files]);
 
   const saveFiles = async (filesToSave: ProjectFile[]) => {
-    for (const file of filesToSave) {
-      await supabase.from("project_files").upsert(
-        {
-          project_id: projectId,
-          path: file.path,
-          content: file.content,
-          language: file.language || detectLanguage(file.path),
-          is_entry_point: file.is_entry_point || false,
-          size_bytes: new TextEncoder().encode(file.content).length,
-        },
-        { onConflict: "project_id,path" }
-      );
-    }
+    const filesArray = filesToSave.map(file => ({
+      project_id: projectId,
+      path: file.path,
+      content: file.content,
+      language: file.language || detectLanguage(file.path),
+      is_entry_point: file.is_entry_point || false,
+      size_bytes: new TextEncoder().encode(file.content).length,
+    }));
+
+    const { error } = await supabase
+      .from("project_files")
+      .upsert(filesArray, { onConflict: "project_id,path" });
+    
+    if (error) throw error;
   };
 
   const saveAllFiles = async () => {

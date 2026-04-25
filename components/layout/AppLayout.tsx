@@ -48,6 +48,7 @@ const AgencyWhiteLabelSettings = dynamic(() => import("@/components/features/Age
 const CreditHistory = dynamic(() => import("@/components/CreditHistory"), { ssr: false });
 const AIBuilder = dynamic(() => import("@/components/features/AIBuilder"), { ssr: false });
 const PricingView = dynamic(() => import("@/components/features/PricingView"), { ssr: false });
+const PreviewSandbox = dynamic(() => import("@/components/PreviewSandbox"), { ssr: false });
 
 interface NavItem {
   id: string;
@@ -127,7 +128,8 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeFiles, setActiveFiles] = useState<AppFile[]>([]);
   const [currentFile, setCurrentFile] = useState<AppFile | null>(null);
-  const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab" | "war-room" | "security" | "tests" | "performance">("none");
+  const [previewFiles, setPreviewFiles] = useState<any[]>([]);
+  const [rightPanel, setRightPanel] = useState<"none" | "review" | "versions" | "deploy" | "collab" | "war-room" | "security" | "tests" | "performance" | "preview">("none");
   const [currentVersion, setCurrentVersion] = useState(initialVersion);
   const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -201,7 +203,7 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
     });
   }, [currentFile]);
 
-  const toggleRightPanel = (panel: "review" | "versions" | "deploy" | "collab" | "war-room" | "security" | "tests" | "performance") => {
+  const toggleRightPanel = (panel: "review" | "versions" | "deploy" | "collab" | "war-room" | "security" | "tests" | "performance" | "preview") => {
     setRightPanel((prev) => (prev === panel ? "none" : panel));
   };
 
@@ -233,29 +235,48 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
         return <CommunityTemplates onFork={(template) => { /* Logic here */ }} />;
       case "editor":
         return (
-          <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+          <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
             <div style={{ flex: 1, overflow: "hidden" }}>
               <MultiFileEditor
                 projectId={projectId!}
                 userId={userId}
+                onChange={(files) => setPreviewFiles(files)}
               />
+            </div>
+
+            {/* Quick Actions Floating Toggle */}
+            <div style={{ position: "absolute", bottom: "32px", right: rightPanel === "none" ? "32px" : "calc(32px + " + (rightPanel === 'preview' ? '50%' : '420px') + ")", zIndex: 60, display: "flex", gap: "8px", transition: "all 0.4s" }}>
+              <button 
+                onClick={() => toggleRightPanel("preview")}
+                style={{ 
+                  padding: "12px 24px", background: rightPanel === "preview" ? "#00ff88" : "#1a1a1a", color: rightPanel === "preview" ? "#000" : "#fff",
+                  borderRadius: "20px", border: "1px solid rgba(255,255,255,0.1)", fontSize: "10px", fontWeight: 900, textTransform: "uppercase",
+                  cursor: "pointer", boxShadow: "0 10px 40px rgba(0,0,0,0.5)", transition: "all 0.2s",
+                }}
+              >
+                {rightPanel === "preview" ? "Close Preview" : "Split Preview"}
+              </button>
             </div>
 
             {/* Right split panel */}
             {rightPanel !== "none" && (
               <div style={{
-                width: isMobile ? "100%" : "420px", 
+                width: isMobile ? "100%" : (rightPanel === "preview" ? "50%" : "420px"), 
                 borderLeft: isMobile ? "none" : "1px solid #262626",
                 display: "flex", flexDirection: "column", overflow: "hidden",
                 position: isMobile ? "absolute" : "relative",
                 top: 0, right: 0, bottom: 0,
                 background: "#0a0a0a",
                 zIndex: 50,
+                transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
               }}>
                 {isMobile && (
                   <div style={{ padding: "10px", borderBottom: "1px solid #262626", display: "flex", justifyContent: "flex-end" }}>
                     <button onClick={() => setRightPanel("none")} style={{ background: "transparent", border: "none", color: "#fff" }}>CLOSE</button>
                   </div>
+                )}
+                {rightPanel === "preview" && (
+                  <PreviewSandbox result={{ files: previewFiles }} />
                 )}
                 {rightPanel === "review" && currentFile && (
                   <AICodeReview
