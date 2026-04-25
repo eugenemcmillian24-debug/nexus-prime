@@ -235,8 +235,8 @@ export default function AppLayout({ userId, projectId, projectName = "Global Con
         return <CommunityTemplates onFork={(template) => { /* Logic here */ }} />;
       case "editor":
         return (
-          <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
-            <div style={{ flex: 1, overflow: "hidden" }}>
+          <div style={{ display: "flex", flex: 1, height: "100%", overflow: "hidden", position: "relative" }}>
+            <div style={{ flex: 1, height: "100%", overflow: "hidden" }}>
               <MultiFileEditor
                 projectId={projectId!}
                 userId={userId}

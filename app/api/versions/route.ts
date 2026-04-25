@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/api";
 import { errorResponse } from "@/lib/apiError";
 
+export const dynamic = 'force-dynamic';
+
 // GET /api/versions?project_id=xxx - List versions for a project
 export async function GET(req: NextRequest) {
   const supabase = createClient();

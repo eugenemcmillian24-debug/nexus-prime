@@ -273,14 +273,14 @@ export default function MultiFileEditor({
 
   if (loading) {
     return (
-      <div className="h-[700px] bg-white/[0.01] border border-white/5 rounded-[32px] flex items-center justify-center">
+      <div className="h-full bg-white/[0.01] border border-white/5 rounded-[32px] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-[#00ff88] animate-spin opacity-50" />
       </div>
     );
   }
 
   return (
-    <div className="h-[700px] bg-white/[0.015] border border-white/5 rounded-[32px] overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-700 shadow-2xl relative z-10">
+    <div className="h-full bg-white/[0.015] border border-white/5 rounded-[32px] overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-700 shadow-2xl relative z-10">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-8 py-4 bg-white/[0.02] border-b border-white/5 backdrop-blur-md">
         <div className="flex items-center gap-4">

@@ -4,6 +4,8 @@ import { NexusOrchestrator } from '@/lib/ai';
 import { errorResponse } from "@/lib/apiError";
 import { z, ZodError } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 // userId is intentionally NOT part of the schema — the route always uses the
 // authenticated user's id from the session, and trusting a client-supplied
 // userId here would be a confused-deputy vulnerability.
