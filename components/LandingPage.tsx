@@ -49,7 +49,7 @@ const FEATURES = [
   {
     icon: Shield,
     title: "Secure Key Management",
-    description: "Securely manage and rotate API keys for Groq, OpenRouter, and Gemini with enterprise-grade encryption."
+    description: "Securely manage and rotate API keys for OpenCode Zen with enterprise-grade encryption."
   },
   {
     icon: Zap,

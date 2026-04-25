@@ -32,7 +32,7 @@ One-click deployment pipeline targeting Vercel, Netlify, and Cloudflare with opt
 - **Framework:** [Next.js 14](https://nextjs.org/) (App Router)
 - **Language:** TypeScript
 - **Styling:** Tailwind CSS + Radix UI + Glassmorphic Design System
-- **Intelligence:** Groq, OpenRouter, Google Gemini (Multimodal)
+- **Intelligence:** OpenCode Zen (Kimi, GLM, MiMo, MiniMax, Qwen, DeepSeek)
 - **Infrastructure:** Supabase (Auth, Realtime, DB)
 - **Billing:** Stripe (Tier-based resource allocation)
 - **Compliance:** Production-hardened with sanitized error handling and secure key rotation.

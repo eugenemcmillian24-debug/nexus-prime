@@ -20,8 +20,6 @@ interface ApiKeyManagerProps {
 
 const PROVIDERS = [
   { id: "zen", name: "Zen (OpenCode)", icon: "☯️", color: "#00ff88", placeholder: "opencode_...", docs: "https://opencode.ai/docs/zen" },
-  { id: "openai", name: "OpenAI", icon: "🤖", color: "#10b981", placeholder: "sk-...", docs: "https://platform.openai.com/api-keys" },
-  { id: "anthropic", name: "Anthropic", icon: "🧠", color: "#ec4899", placeholder: "sk-ant-...", docs: "https://console.anthropic.com/settings/keys" },
   { id: "vercel", name: "Vercel", icon: "▲", color: "#ffffff", placeholder: "vercel_...", docs: "https://vercel.com/account/tokens" },
   { id: "stripe", name: "Stripe", icon: "💳", color: "#635bff", placeholder: "sk_live_...", docs: "https://dashboard.stripe.com/apikeys" },
 ];

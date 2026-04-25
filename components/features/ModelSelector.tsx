@@ -15,20 +15,20 @@ interface ModelOption {
 }
 
 const REASONER_MODELS: ModelOption[] = [
-  { id: "minimax-m2.5-free", name: "Minimax M2.5", provider: "Zen", description: "Default free reasoning", speed: "fast", quality: "standard", creditCost: 0, icon: Brain },
-  { id: "nemotron-3-super-free", name: "Nemotron 3 Super", provider: "Zen", description: "Balanced free reasoning", speed: "medium", quality: "high", creditCost: 0, icon: Brain },
-  { id: "gpt-4o", name: "GPT-4o", provider: "Zen", description: "Premium paid reasoning", speed: "fast", quality: "premium", creditCost: 15, icon: Brain },
+  { id: "minimax-m2.5", name: "Minimax M2.5", provider: "Zen", description: "Default free reasoning", speed: "fast", quality: "standard", creditCost: 0, icon: Brain },
+  { id: "kimi-k2.5", name: "Kimi K2.5", provider: "Zen", description: "Advanced free reasoning", speed: "medium", quality: "high", creditCost: 0, icon: Brain },
+  { id: "deepseek-v4", name: "DeepSeek V4", provider: "Zen", description: "Premium paid reasoning", speed: "fast", quality: "premium", creditCost: 15, icon: Brain },
 ];
 
 const CODER_MODELS: ModelOption[] = [
-  { id: "hy3-preview-free", name: "HY3 Preview", provider: "Zen", description: "Fast free coding", speed: "fast", quality: "standard", creditCost: 0, icon: Zap },
-  { id: "big-pickle", name: "Big Pickle", provider: "Zen", description: "Capable free coding", speed: "medium", quality: "high", creditCost: 0, icon: Zap },
-  { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet", provider: "Zen", description: "Best-in-class coding", speed: "slow", quality: "premium", creditCost: 25, icon: Zap },
+  { id: "qwen-3.5", name: "Qwen 3.5", provider: "Zen", description: "Fast free coding", speed: "fast", quality: "standard", creditCost: 0, icon: Zap },
+  { id: "kimi-k2.6", name: "Kimi K2.6", provider: "Zen", description: "Capable free coding", speed: "medium", quality: "high", creditCost: 0, icon: Zap },
+  { id: "glm-5.1", name: "GLM 5.1", provider: "Zen", description: "Best-in-class coding", speed: "slow", quality: "premium", creditCost: 25, icon: Zap },
 ];
 
 const VISION_MODELS: ModelOption[] = [
-  { id: "ling-2.6-flash", name: "Ling 2.6 Flash", provider: "Zen", description: "Fast free vision", speed: "fast", quality: "high", creditCost: 0, icon: Eye },
-  { id: "deepseek-v3", name: "DeepSeek V3", provider: "Zen", description: "Advanced visual analysis", speed: "medium", quality: "premium", creditCost: 15, icon: Eye },
+  { id: "minimax-m2.7", name: "Minimax M2.7", provider: "Zen", description: "Fast free vision", speed: "fast", quality: "high", creditCost: 0, icon: Eye },
+  { id: "mimo-v2.5", name: "MiMo V2.5", provider: "Zen", description: "Advanced visual analysis", speed: "medium", quality: "premium", creditCost: 15, icon: Eye },
 ];
 
 const speedColors = { fast: "text-[#00ff88]", medium: "text-[#ffaa00]", slow: "text-[#ff4444]" };
@@ -45,7 +45,7 @@ export interface ModelSelection {
 }
 
 export default function ModelSelector({
-  selection = { reasoner: "minimax-m2.5-free", coder: "hy3-preview-free", vision: "ling-2.6-flash" },
+  selection = { reasoner: "minimax-m2.5", coder: "qwen-3.5", vision: "minimax-m2.7" },
   onChange = () => {},
 }: {
   selection?: ModelSelection;

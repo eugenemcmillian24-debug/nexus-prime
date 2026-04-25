@@ -28,7 +28,7 @@ export async function GET(
     slug: project.slug || project.name.toLowerCase().replace(/ /g, "-"),
     isPublic: project.is_public,
     teamId: project.team_id || null,
-    defaultModel: project.default_model || "groq",
+    defaultModel: project.default_model || "qwen-3.6",
     autoSave: project.auto_save ?? true,
     autoFormat: project.auto_format ?? true,
     tabSize: project.tab_size || 2,

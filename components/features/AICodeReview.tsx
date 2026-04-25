@@ -65,7 +65,7 @@ export default function AICodeReview({
   const [isReviewing, setIsReviewing] = useState(false);
   const [expandedFindings, setExpandedFindings] = useState<Set<string>>(new Set());
   const [filterSeverity, setFilterSeverity] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState("groq");
+  const [selectedModel, setSelectedModel] = useState("qwen-3.6");
 
   const startReview = useCallback(async () => {
     setIsReviewing(true);
@@ -135,9 +135,9 @@ export default function AICodeReview({
               color: "#e5e5e5", padding: "6px 10px", fontSize: "13px", cursor: "pointer",
             }}
           >
-            <option value="groq">Groq (Fast)</option>
-            <option value="gemini">Gemini (Balanced)</option>
-            <option value="openrouter">OpenRouter (Advanced)</option>
+            <option value="qwen-3.6">Zen Qwen (Fast)</option>
+            <option value="kimi-k2.6">Zen Kimi (Balanced)</option>
+            <option value="deepseek-v4">Zen DeepSeek (Premium)</option>
           </select>
 
           {/* Score badge */}
