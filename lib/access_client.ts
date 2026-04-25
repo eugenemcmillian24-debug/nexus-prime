@@ -8,7 +8,8 @@ export function checkIsAdmin(user: User | null) {
   if (!user) return false;
 
   const isAdmin = user.app_metadata?.role === 'admin' || user.user_metadata?.is_admin === true;
-  const superuserEmails = ['eugenemcmillian9@gmail.com'];
+  const adminAccess = process.env.NEXT_PUBLIC_ADMIN_ACCESS || process.env.ADMIN_ACCESS || '';
+  const superuserEmails = adminAccess.split(',').map(email => email.trim()).filter(Boolean);
 
   return isAdmin || superuserEmails.includes(user.email || '');
 }

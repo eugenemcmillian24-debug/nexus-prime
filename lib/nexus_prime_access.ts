@@ -29,7 +29,8 @@ export async function isNexusPrimeAdmin() {
   if (isAdmin) return true;
 
   // 3. STRICT SUPERUSER OVERRIDE (Legacy/Bootstrap)
-  const superuserEmails = ['eugenemcmillian9@gmail.com'];
+  const adminAccess = process.env.ADMIN_ACCESS || '';
+  const superuserEmails = adminAccess.split(',').map(email => email.trim()).filter(Boolean);
   return superuserEmails.includes(user.email || '');
 }
 
