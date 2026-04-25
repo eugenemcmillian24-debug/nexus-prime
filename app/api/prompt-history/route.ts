@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       prompt: body.prompt,
       response: body.response,
-      model: body.model || "groq",
+      model: body.model || "qwen-3.6",
       template_id: body.templateId || null,
       template_name: body.templateName || null,
       tokens_input: body.tokens?.input || 0,

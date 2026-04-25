@@ -218,9 +218,9 @@ export default function ProjectSettingsPanel({ projectId, onUpdate }: ProjectSet
               <div style={{ marginBottom: "20px" }}>
                 <label style={labelStyle}>Default AI Model</label>
                 <select value={settings.defaultModel} onChange={(e) => updateField("defaultModel", e.target.value)} style={{ ...inputStyle, cursor: "pointer" }}>
-                  <option value="groq">Groq (Fast)</option>
-                  <option value="gemini">Gemini (Balanced)</option>
-                  <option value="openrouter">OpenRouter (Advanced)</option>
+                  <option value="qwen-3.6">Zen Qwen (Fast)</option>
+                  <option value="kimi-k2.6">Zen Kimi (Balanced)</option>
+                  <option value="deepseek-v4">Zen DeepSeek (Premium)</option>
                 </select>
               </div>
               <div style={{ marginBottom: "20px" }}>

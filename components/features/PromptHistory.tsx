@@ -24,9 +24,9 @@ interface PromptHistoryProps {
 }
 
 const MODEL_COLORS: Record<string, string> = {
-  groq: "#f97316",
-  gemini: "#3b82f6",
-  openrouter: "#8b5cf6",
+  qwen: "#f97316",
+  kimi: "#3b82f6",
+  deepseek: "#8b5cf6",
 };
 
 export default function PromptHistory({ projectId, onReplayPrompt }: PromptHistoryProps) {
@@ -170,7 +170,7 @@ export default function PromptHistory({ projectId, onReplayPrompt }: PromptHisto
             ⭐
           </button>
 
-          {["groq", "gemini", "openrouter"].map((model) => (
+          {["qwen", "kimi", "deepseek"].map((model) => (
             <button
               key={model}
               onClick={() => setFilterModel(filterModel === model ? null : model)}

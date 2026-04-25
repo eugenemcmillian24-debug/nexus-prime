@@ -3,7 +3,7 @@ import { TIER_LIMITS } from './nexus_prime_constants';
 import crypto from 'crypto';
 
 // ─── ZEN (OPENCODE) AI ENGINE ───────────────────────────────────────────────
-// Unified AI completion path using the Zen OpenAI-compatible endpoint.
+// Unified AI completion path using the Zen OpenCode-compatible endpoint.
 
 const ZEN_ENDPOINT = "https://opencode.ai/zen/v1/chat/completions";
 
@@ -31,7 +31,7 @@ const PROVIDERS = {
 // This helper walks the text once and escapes those raw whitespace characters
 // only when we're inside a string. We keep it deliberately small — it does NOT
 // try to be a full JSON5 / jsonc fallback, just handles the one failure mode
-// we actually observe from Groq/OpenRouter responses.
+// we actually observe from some model responses.
 function repairJsonStrings(s: string): string {
   let out = "";
   let inString = false;
@@ -99,7 +99,7 @@ export type TestResults = {
 // The Reviewer runs AFTER the Executor to perform a functional review of
 // the build against the original plan. "Does this actually implement what
 // was asked for?" — not "does it parse" (Linter) or "do the tests import
-// correctly" (Executor). Uses claude-sonnet-4.5 via OpenRouter.
+// correctly" (Executor). Uses Zen Paid Tier models.
 
 export type ReviewResults = {
   plan_alignment: "high" | "medium" | "low";
@@ -1034,8 +1034,7 @@ RULES:
       // STEP 8: REVIEW - FUNCTIONAL REVIEW AGAINST THE PLAN
       // Non-blocking: reviewer failures log an event + return a
       // fallback ReviewResults; they never mark the build failed.
-      // Uses claude-sonnet-4.5 on OpenRouter directly (bypasses the
-      // Groq fallback chain) for the strongest reasoner available.
+      // Uses the strongest Zen Paid model for the functional review.
       const reviewResults = await this.runReviewerAgent(jobId, plan, finalCode, testResults);
 
       // FINAL: COMPLETE

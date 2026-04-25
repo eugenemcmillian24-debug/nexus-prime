@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       project_id: projectId,
       file_id: fileId || null,
       file_path: filePath,
-      model_used: model || "groq",
+      model_used: model || "qwen-3.6",
       review_type: reviewType || "general",
       status: "in_progress",
       requested_by: user.id,
@@ -74,7 +74,7 @@ Respond ONLY with valid JSON in this exact format:
       { role: "system", content: systemPrompt },
       { role: "user", content: `File: ${filePath}\nLanguage: ${language || "unknown"}\n\n\`\`\`\n${code}\n\`\`\`` },
     ], { 
-      preferModel: model === 'claude' ? 'claude-3-5-sonnet' : 'gpt-4o',
+      preferModel: modelConfig,
       temperature: 0.3,
       max_tokens: 4096 
     });
