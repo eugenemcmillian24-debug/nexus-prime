@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Send, Loader2, Wand2, RotateCcw } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
 
 interface RefinementMessage {
   id: string;
@@ -64,17 +67,58 @@ export default function IterativeRefinement({
         throw new Error(data.error || "Refinement failed");
       }
 
-      const assistantMessage: RefinementMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: `✅ Applied changes. ${data.changedFiles || 0} file(s) updated.`,
-        timestamp: new Date(),
-      };
+      if (data.status === "pending" && data.jobId) {
+        // Subscribe to job completion
+        const channel = supabase
+          .channel(`job-${data.jobId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "agent_jobs",
+              filter: `id=eq.${data.jobId}`,
+            },
+            (payload: any) => {
+              if (payload.new.status === "completed") {
+                const assistantMessage: RefinementMessage = {
+                  id: crypto.randomUUID(),
+                  role: "assistant",
+                  content: `✅ Applied changes. New version created.`,
+                  timestamp: new Date(),
+                };
+                setMessages((prev) => [...prev, assistantMessage]);
+                onNewBuild(payload.new.result);
+                setIsRefining(false);
+                channel.unsubscribe();
+              } else if (payload.new.status === "failed") {
+                const errorMessage: RefinementMessage = {
+                  id: crypto.randomUUID(),
+                  role: "assistant",
+                  content: `❌ Refinement failed. Please try again.`,
+                  timestamp: new Date(),
+                };
+                setMessages((prev) => [...prev, errorMessage]);
+                setIsRefining(false);
+                channel.unsubscribe();
+              }
+            }
+          )
+          .subscribe();
+      } else {
+        const assistantMessage: RefinementMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `✅ Applied changes. ${data.changedFiles || 0} file(s) updated.`,
+          timestamp: new Date(),
+        };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+        setMessages((prev) => [...prev, assistantMessage]);
 
-      if (data.result) {
-        onNewBuild(data.result);
+        if (data.result) {
+          onNewBuild(data.result);
+        }
+        setIsRefining(false);
       }
     } catch (err: any) {
       const errorMessage: RefinementMessage = {
@@ -84,7 +128,6 @@ export default function IterativeRefinement({
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
-    } finally {
       setIsRefining(false);
     }
   };

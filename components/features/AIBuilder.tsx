@@ -32,6 +32,32 @@ export default function AIBuilder({ userId, isAdmin, credits }: { userId: string
     fetchModules();
   }, [userId]);
 
+  useEffect(() => {
+    if (!jobId) return;
+
+    const channel = supabase
+      .channel(`job-status-${jobId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "agent_jobs",
+          filter: `id=eq.${jobId}`,
+        },
+        (payload: any) => {
+          if (payload.new.status === "completed") {
+            setJobResult(payload.new.result);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [jobId]);
+
   const tier = (credits?.tier || "Starter") as keyof typeof TIER_LIMITS;
   const tierConfig = TIER_LIMITS[tier] || TIER_LIMITS['Starter'];
   const canUsePremiumAgents = tierConfig.premiumAgents || isAdmin;

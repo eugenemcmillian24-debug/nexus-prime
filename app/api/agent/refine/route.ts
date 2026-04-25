@@ -4,6 +4,7 @@ import { z, ZodError } from "zod";
 import { aiComplete } from "@/lib/ai";
 import { isNexusPrimeAdmin } from "@/lib/nexus_prime_access";
 import { errorResponse } from "@/lib/apiError";
+import { waitUntil } from "@vercel/functions";
 
 const RefineSchema = z.object({
   userId: z.string().uuid(),
@@ -67,53 +68,77 @@ export async function POST(req: Request) {
       creditResult = rpcResult;
     }
 
-    // Call refinement agent
-    const rawOutput = await aiComplete([
-      { role: "system", content: REFINE_SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `Current Code:\n${currentCode}\n\nRefinement Request: ${refinementPrompt}`,
-      },
-    ], { preferModel: "llama-3.3-70b-versatile" });
-
-    let refinedCode;
-    try {
-      const jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
-      refinedCode = JSON.parse(jsonMatch ? jsonMatch[0] : rawOutput);
-    } catch {
-      refinedCode = JSON.parse(currentCode);
-    }
-
-    // Create new version job
     const newVersion = (parentJob.version || 1) + 1;
 
-    const { data: newJob } = await supabase
+    // Create a pending job
+    const { data: newJob, error: jobError } = await supabase
       .from("agent_jobs")
       .insert({
         user_id: userId,
-        status: "completed",
+        status: "pending",
         agent_type: "refiner",
         prompt: refinementPrompt,
         parent_job_id: parentJobId,
         thread_id: parentJob.thread_id,
         version: newVersion,
         credits_cost: 5,
-        result: {
-          code: refinedCode,
-          refinement: true,
-          parentJobId,
-        },
       })
       .select()
       .single();
 
+    if (jobError || !newJob) {
+      return NextResponse.json({ error: "Failed to create job" }, { status: 500 });
+    }
+
+    // Background process using waitUntil
+    waitUntil((async () => {
+      try {
+        // Call refinement agent
+        const rawOutput = await aiComplete([
+          { role: "system", content: REFINE_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `Current Code:\n${currentCode}\n\nRefinement Request: ${refinementPrompt}`,
+          },
+        ], { preferModel: "llama-3.3-70b-versatile" });
+
+        let refinedCode;
+        try {
+          const jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
+          refinedCode = JSON.parse(jsonMatch ? jsonMatch[0] : rawOutput);
+        } catch {
+          refinedCode = JSON.parse(currentCode);
+        }
+
+        // Update job with result
+        await supabase
+          .from("agent_jobs")
+          .update({
+            status: "completed",
+            result: {
+              code: refinedCode,
+              refinement: true,
+              parentJobId,
+            },
+          })
+          .eq("id", newJob.id);
+          
+      } catch (err) {
+        console.error("Background refinement error:", err);
+        await supabase
+          .from("agent_jobs")
+          .update({ status: "failed" })
+          .eq("id", newJob.id);
+      }
+    })());
+
     return NextResponse.json({
-      jobId: newJob?.id,
-      result: { code: refinedCode },
-      changedFiles: refinedCode.files?.length || 0,
+      jobId: newJob.id,
+      status: "pending",
       version: newVersion,
       newBalance: creditResult.new_balance,
     });
+
   } catch (error: any) {
     if (error instanceof ZodError) {
       return NextResponse.json(
