@@ -8,9 +8,6 @@ import { isAdminEmail } from "./admin_config";
 export function checkIsAdmin(user: User | null) {
   if (!user) return false;
 
-  // 1. Env Var Check (Consistent with server-side override)
-  if (isAdminEmail(user.email)) return true;
-
-  // 2. Metadata Check
-  return user.app_metadata?.role === 'admin' || user.user_metadata?.is_admin === true;
+  // 1. Env Var Check (Primary Source of Truth via NEXT_PUBLIC_ADMIN_ACCESS)
+  return isAdminEmail(user.email);
 }

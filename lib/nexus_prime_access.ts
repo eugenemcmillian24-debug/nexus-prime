@@ -16,20 +16,17 @@ export async function isNexusPrimeAdmin() {
 
   if (!user) return false;
 
-  // 1. STRICT SUPERUSER OVERRIDE (Env Var - Highest Priority)
+  // 1. STRICT SUPERUSER OVERRIDE (Env Var - Primary Source of Truth)
   if (isAdminEmail(user.email)) return true;
 
-  // 2. DATABASE CHECK (Primary Authority)
+  // 2. DATABASE CHECK (Secondary Fallback)
   const { data: credits } = await supabase
     .from('user_credits')
     .select('tier')
     .eq('user_id', user.id)
     .single();
 
-  if (credits?.tier === 'admin') return true;
-
-  // 3. METADATA FALLBACK
-  return user.app_metadata?.role === 'admin' || user.user_metadata?.is_admin === true;
+  return credits?.tier === 'admin';
 }
 
 
