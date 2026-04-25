@@ -251,7 +251,7 @@ export async function aiComplete(
       if (!res.ok) {
         const errBody = await res.text().catch(() => "no-body");
         const msg = `[Zen/${model}] failed (${res.status}): ${errBody}`;
-        console.warn(msg);
+        console.error(msg); // Use console.error for better visibility
         errors.push(msg);
         continue;
       }
@@ -260,14 +260,17 @@ export async function aiComplete(
       const content = data.choices?.[0]?.message?.content;
       if (content) return content as string;
     } catch (err: any) {
-      const msg = `[Zen/${model}] error: ${err.message || String(err)}`;
-      console.warn(msg);
+      const isTimeout = err.name === 'AbortError';
+      const msg = `[Zen/${model}] error: ${isTimeout ? 'Request timed out after 60s' : (err.message || String(err))}`;
+      console.error(msg);
       errors.push(msg);
       continue;
     }
   }
 
-  throw new Error(`All Zen models failed. Details:\n${errors.join("\n")}`);
+  const finalError = `All Zen models failed after ${models.length} attempts. Details:\n${errors.join("\n")}`;
+  console.error(finalError);
+  throw new Error(finalError);
 }
 
 export async function aiCompleteStream(
@@ -304,27 +307,30 @@ export async function aiCompleteStream(
       if (!res.ok) {
         const errBody = await res.text().catch(() => "no-body");
         const msg = `[Zen/${model}] stream failed (${res.status}): ${errBody}`;
-        console.warn(msg);
+        console.error(msg);
         errors.push(msg);
         continue;
       }
       if (!res.body) {
         const msg = `[Zen/${model}] stream error: Empty response body`;
-        console.warn(msg);
+        console.error(msg);
         errors.push(msg);
         continue;
       }
 
       return res.body;
     } catch (err: any) {
-      const msg = `[Zen/${model}] stream error: ${err.message || String(err)}`;
-      console.warn(msg);
+      const isTimeout = err.name === 'AbortError';
+      const msg = `[Zen/${model}] stream error: ${isTimeout ? 'Request timed out after 60s' : (err.message || String(err))}`;
+      console.error(msg);
       errors.push(msg);
       continue;
     }
   }
 
-  throw new Error(`All Zen models failed (stream). Details:\n${errors.join("\n")}`);
+  const finalError = `All Zen models failed (stream) after ${models.length} attempts. Details:\n${errors.join("\n")}`;
+  console.error(finalError);
+  throw new Error(finalError);
 }
 
 // ─── AGENT CONFIG & PROMPTS ──────────────────────────────────────────────────

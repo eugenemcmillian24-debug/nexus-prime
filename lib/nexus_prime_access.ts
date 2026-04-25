@@ -1,6 +1,7 @@
 import 'server-only';
 import { createClient } from './supabase/server';
 import { TIER_LIMITS, PREMIUM_AGENTS } from './nexus_prime_constants';
+import { isAdminEmail } from './admin_config';
 
 export { TIER_LIMITS, PREMIUM_AGENTS };
 
@@ -16,10 +17,7 @@ export async function isNexusPrimeAdmin() {
   if (!user) return false;
 
   // 1. STRICT SUPERUSER OVERRIDE (Env Var - Highest Priority)
-  // This allows bootstrapping or emergency access without DB calls.
-  const adminAccess = process.env.ADMIN_ACCESS || '';
-  const superuserEmails = adminAccess.split(',').map(email => email.trim()).filter(Boolean);
-  if (superuserEmails.includes(user.email || '')) return true;
+  if (isAdminEmail(user.email)) return true;
 
   // 2. DATABASE CHECK (Primary Authority)
   const { data: credits } = await supabase
