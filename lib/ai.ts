@@ -1,6 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 import { TIER_LIMITS } from './nexus_prime_constants';
 import crypto from 'crypto';
+import { ForgeAutomationService } from './forge_automation';
+
+export type JobStep = 
+  | 'PENDING' 
+  | 'REASONING' 
+  | 'PLANNING' 
+  | 'CODING' 
+  | 'LINTING' 
+  | 'TYPECHECKING' 
+  | 'TESTING' 
+  | 'SMOKE_TESTING' 
+  | 'DEPLOYING' 
+  | 'COMPLETED'
+  | 'FAILED';
 
 // ─── ZEN (OPENCODE) AI ENGINE ───────────────────────────────────────────────
 // Unified AI completion path using the Zen OpenCode-compatible endpoint.
@@ -648,6 +662,34 @@ Return ONLY a JSON array of optimization objects:
 ]
 `.trim();
 
+const TYPECHECK_AGENT_SYSTEM_PROMPT = `
+You are the NEXUS PRIME TypeCheck Agent. Your goal is to find TypeScript errors in the generated multi-file JSON.
+Analyze the files for:
+1. Missing imports.
+2. Property type mismatches.
+3. Incorrect use of React hooks.
+4. Non-existent exports being imported.
+
+Return ONLY a JSON object:
+{
+  "errors": [
+    { "file": "string", "line": number, "message": "string", "severity": "error" | "warning" }
+  ]
+}
+`.trim();
+
+const SMOKE_TEST_AGENT_SYSTEM_PROMPT = `
+You are the NEXUS PRIME Smoke Test Agent. Your goal is to "simulate" a user walkthrough and identify UI-breaking bugs.
+Analyze the generated code and identify potential runtime failures or UX dead-ends.
+
+Return ONLY a JSON object:
+{
+  "findings": [
+    { "component": "string", "issue": "string", "severity": "critical" | "warning" }
+  ]
+}
+`.trim();
+
 const MARKETING_PSY_SYSTEM_PROMPT = `
 You are the NEXUS PRIME Marketing Psychology Agent. Your goal is to optimize the UI for conversion, engagement, and user retention.
 Use principles like:
@@ -733,10 +775,12 @@ Return ONLY the raw JSON object. No conversational filler.
 export class NexusOrchestrator {
   private zenKey: string;
   private supabase: any;
+  private automation: ForgeAutomationService;
 
   constructor(config: AgentConfig) {
     this.zenKey = config.zenKey;
     this.supabase = createClient(config.supabaseUrl, config.supabaseKey);
+    this.automation = new ForgeAutomationService(config.supabaseUrl, config.supabaseKey);
   }
 
   /**
@@ -746,105 +790,280 @@ export class NexusOrchestrator {
     return await aiComplete(messages, { zenKey: this.zenKey, preferModel });
   }
 
-  /**
-   * Multi-Agent Execution Pipeline
-   * 1. Reasoner -> Logic / Chain of Thought
-   * 2. Orchestrator -> Plan / Tool Selection
-   * 3. Coder -> Execution / Code Generation
-   * 4. Linter -> Quality Assurance
-   * 5. Tester -> Generates Vitest suites for the final code
-   * 6. Executor -> AST-lite validates tester imports; retries Coder once on failure
-   * 7. Reviewer (Zen Paid Tier) -> Functional review against plan
-   */
   async executeJob(jobId: string, options?: { isUnthrottled?: boolean }) {
+    // Legacy entry point - now just starts the state machine
+    return this.processNextStep(jobId, options);
+  }
+
+  async processNextStep(jobId: string, options?: { isUnthrottled?: boolean }): Promise<void> {
     try {
-      // Fetch the job itself. Split related lookups into separate queries to
-      // avoid PostgREST embed ambiguity (user_credits.user_id and
-      // agent_jobs.user_id both reference auth.users, so there is no direct
-      // FK between the two public tables — embedding them can fail at runtime
-      // and previously caused silent drops with `if (!job) return;`).
       const { data: job, error: jobErr } = await this.supabase
         .from('agent_jobs')
-        .select('*')
+        .select('*, automation_configs:automation_config_id(*)')
         .eq('id', jobId)
         .single();
-      if (jobErr) throw new Error(`Failed to load agent_job ${jobId}: ${jobErr.message}`);
-      if (!job) throw new Error(`agent_job ${jobId} not found`);
 
-      let customSystemPrompt = '';
-      if (job.training_module_id) {
-        const { data: mod, error: modErr } = await this.supabase
-          .from('agent_training_modules')
-          .select('system_prompt')
-          .eq('id', job.training_module_id)
-          .maybeSingle();
-        if (modErr) throw new Error(`Failed to load agent_training_modules ${job.training_module_id}: ${modErr.message}`);
-        customSystemPrompt = mod?.system_prompt || '';
+      if (jobErr || !job) throw new Error(`Failed to load job ${jobId}`);
+      if (job.status === 'completed' || job.status === 'failed') return;
+
+      const currentStep = (job.current_step || 'PENDING') as JobStep;
+
+      // Update job status to running if it was pending
+      if (job.status === 'pending') {
+        await this.supabase.from('agent_jobs').update({ status: 'running' }).eq('id', jobId);
       }
 
-      const { data: creditsRow, error: creditsErr } = await this.supabase
-        .from('user_credits')
-        .select('agency_mode, agency_config, tier')
-        .eq('user_id', job.user_id)
-        .maybeSingle();
-      if (creditsErr) throw new Error(`Failed to load user_credits for user ${job.user_id}: ${creditsErr.message}`);
-
-      const isUnthrottled = options?.isUnthrottled || process.env.NEXUS_UNTHROTTLED_BUILD === 'true';
-      const isAgencyMode = creditsRow?.agency_mode || false;
-      const agencyConfig = creditsRow?.agency_config || {};
-      const userTier = creditsRow?.tier || 'Free';
-      const isPriority = (TIER_LIMITS as any)[userTier]?.priorityCompute || false;
-
-      await this.supabase.from('agent_jobs').update({ status: 'running' }).eq('id', jobId);
-
-      // Fetch existing project files for context
-      let existingFilesContext = '';
-      if (job.project_id) {
-        const { data: existingFiles } = await this.supabase
-          .from('project_files')
-          .select('path, content')
-          .eq('project_id', job.project_id);
-        
-        if (existingFiles && existingFiles.length > 0) {
-          existingFilesContext = `\n\nCURRENT PROJECT STATE (Iterative Chat):\n${existingFiles.map((f: any) => `File: ${f.path}\nContent:\n${f.content}`).join('\n\n---\n\n')}`;
-        }
+      switch (currentStep) {
+        case 'PENDING':
+          await this.handleReasoning(job, options);
+          break;
+        case 'REASONING':
+          await this.handlePlanning(job, options);
+          break;
+        case 'PLANNING':
+          await this.handleCoding(job, options);
+          break;
+        case 'CODING':
+          await this.handleLinting(job, options);
+          break;
+        case 'LINTING':
+          await this.handleTypeChecking(job, options);
+          break;
+        case 'TYPECHECKING':
+          await this.handleTesting(job, options);
+          break;
+        case 'TESTING':
+          await this.handleSmokeTesting(job, options);
+          break;
+        case 'SMOKE_TESTING':
+          await this.handleDeployment(job, options);
+          break;
+        case 'DEPLOYING':
+          // Wait for webhook or poll
+          await this.checkDeploymentStatus(job);
+          break;
+        default:
+          console.log(`Unknown step: ${currentStep}`);
       }
+    } catch (err: any) {
+      console.error(`Error in processNextStep for job ${jobId}:`, err);
+      await this.logEvent(jobId, 'system', 'error', err.message);
+      await this.supabase.from('agent_jobs').update({ status: 'failed', error: err.message }).eq('id', jobId);
+    }
+  }
 
-      // STEP 1: REASONING (Zen Free/Paid Tier)
-      await this.logEvent(jobId, 'reasoner', 'thought', 'Initializing deep reasoning...');
-      const reasoning = await this.callAI([
-        { role: 'system', content: 'You are the Reasoner. Break down the user prompt into a logical architecture.' },
-        { role: 'user', content: `Prompt: ${job.prompt}${existingFilesContext}` }
-      ], isPriority ? 'deepseek-v4' : 'minimax-m2.5');
-      await this.logEvent(jobId, 'reasoner', 'completion', reasoning);
+  private async handleReasoning(job: any, options: any) {
+    await this.updateStep(job.id, 'REASONING');
+    await this.logEvent(job.id, 'reasoner', 'thought', 'Initializing deep reasoning...');
+    
+    const isPriority = options?.isUnthrottled || false;
+    let existingFilesContext = await this.getExistingFilesContext(job.project_id);
+    const reasoning = await this.callAI([
+      { role: 'system', content: 'You are the Reasoner. Break down the user prompt into a logical architecture.' },
+      { role: 'user', content: `Prompt: ${job.prompt}${existingFilesContext}` }
+    ], isPriority ? 'deepseek-v4' : 'minimax-m2.5');
+    
+    await this.logEvent(job.id, 'reasoner', 'completion', reasoning);
+    await this.supabase.from('agent_jobs').update({ 
+      result: { ...(job.result || {}), reasoning } 
+    }).eq('id', job.id);
 
-      // Intermediate status update to keep connection alive and persist progress
-      await this.supabase.from('agent_jobs').update({ 
-        result: { reasoning } 
-      }).eq('id', jobId);
+    return this.processNextStep(job.id, options);
+  }
 
-      // STEP 2: ORCHESTRATION
-      await this.logEvent(jobId, 'orchestrator', 'thought', 'Generating execution plan based on reasoning...');
-      const plan = await this.callAI([
-        { role: 'system', content: 'You are the Orchestrator. Create a task list for the Coder agent.' },
-        { role: 'user', content: `Reasoning: ${reasoning}\nPrompt: ${job.prompt}${existingFilesContext}` }
-      ], isPriority ? 'glm-5.1' : 'qwen-3.6');
-      await this.logEvent(jobId, 'orchestrator', 'completion', plan);
+  private async handlePlanning(job: any, options: any) {
+    await this.updateStep(job.id, 'PLANNING');
+    await this.logEvent(job.id, 'orchestrator', 'thought', 'Generating execution plan...');
+    
+    const isPriority = options?.isUnthrottled || false;
+    let existingFilesContext = await this.getExistingFilesContext(job.project_id);
+    const plan = await this.callAI([
+      { role: 'system', content: 'You are the Orchestrator. Create a task list for the Coder agent.' },
+      { role: 'user', content: `Reasoning: ${job.result.reasoning}\nPrompt: ${job.prompt}${existingFilesContext}` }
+    ], isPriority ? 'glm-5.1' : 'qwen-3.6');
 
-      // Persist plan
-      await this.supabase.from('agent_jobs').update({ 
-        result: { reasoning, plan } 
-      }).eq('id', jobId);
+    await this.logEvent(job.id, 'orchestrator', 'completion', plan);
+    await this.supabase.from('agent_jobs').update({ 
+      result: { ...(job.result || {}), plan } 
+    }).eq('id', job.id);
 
-      // STEP 3: CODING - MULTI-FILE JSON
-      await this.logEvent(jobId, 'coder', 'thought', 'Writing multi-file code structure...');
-      
-      let systemPrompt = CODER_SYSTEM_PROMPT;
-      let linterPrompt = LINTER_SYSTEM_PROMPT;
-      let testerPrompt = TESTER_SYSTEM_PROMPT;
-      
-      if (job.agent_type === 'refiner') {
-        systemPrompt = `
+    return this.processNextStep(job.id, options);
+  }
+
+  private async handleCoding(job: any, options: any) {
+    await this.updateStep(job.id, 'CODING');
+    await this.logEvent(job.id, 'coder', 'thought', 'Writing multi-file code structure...');
+    
+    const isPriority = options?.isUnthrottled || false;
+    let existingFilesContext = await this.getExistingFilesContext(job.project_id);
+    let systemPrompt = this.getCoderPrompt(job);
+
+    const coderResponse = await this.callAI([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Plan: ${job.result.plan}${existingFilesContext}` }
+    ], isPriority ? 'deepseek-v4' : 'minimax-m2.7');
+
+    const parsedCoder = parseJsonLoose<{ files?: { path: string; content: string }[] }>(coderResponse);
+    let codeFiles: { path: string; content: string }[];
+    if (parsedCoder?.files && Array.isArray(parsedCoder.files)) {
+      codeFiles = parsedCoder.files;
+    } else {
+      codeFiles = [{ path: "app/page.tsx", content: coderResponse }];
+    }
+    const code = { files: codeFiles };
+
+    await this.logEvent(job.id, 'coder', 'completion', `Generated ${codeFiles.length} files`);
+    
+    if (job.project_id) {
+      await this.upsertProjectFiles(job.project_id, codeFiles);
+    }
+
+    await this.supabase.from('agent_jobs').update({ 
+      result: { ...(job.result || {}), code } 
+    }).eq('id', job.id);
+
+    return this.processNextStep(job.id, options);
+  }
+
+  private async handleLinting(job: any, options: any) {
+    await this.updateStep(job.id, 'LINTING');
+    await this.logEvent(job.id, 'linter', 'thought', 'Linting code...');
+    
+    const isPriority = options?.isUnthrottled || false;
+    const linterResponse = await this.callAI([
+      { role: 'system', content: LINTER_SYSTEM_PROMPT },
+      { role: 'user', content: `Code: ${JSON.stringify(job.result.code)}` }
+    ], isPriority ? 'glm-5' : 'kimi-k2.6');
+
+    const parsedLinter = parseJsonLoose<{ files?: { path: string; content: string }[] }>(linterResponse);
+    const finalCode = parsedLinter?.files ? parsedLinter : job.result.code;
+
+    await this.supabase.from('agent_jobs').update({ 
+      result: { ...(job.result || {}), code: finalCode } 
+    }).eq('id', job.id);
+
+    return this.processNextStep(job.id, options);
+  }
+
+  private async handleTypeChecking(job: any, options: any) {
+    await this.updateStep(job.id, 'TYPECHECKING');
+    await this.logEvent(job.id, 'typechecker', 'thought', 'Performing AI-driven type check...');
+
+    const response = await this.callAI([
+      { role: 'system', content: TYPECHECK_AGENT_SYSTEM_PROMPT },
+      { role: 'user', content: `Code: ${JSON.stringify(job.result.code)}` }
+    ]);
+
+    const verification_results = parseJsonLoose(response) || { errors: [] };
+
+    await this.supabase.from('agent_jobs').update({
+      verification_results: { ...(job.verification_results || {}), typecheck: verification_results }
+    }).eq('id', job.id);
+
+    return this.processNextStep(job.id, options);
+  }
+
+  private async handleTesting(job: any, options: any) {
+    await this.updateStep(job.id, 'TESTING');
+    const testerFiles = await this.runTesterAgent(job.id, job.result.code, job.result.plan);
+
+    const codeWithTests = {
+      ...job.result.code,
+      files: [...(job.result.code.files || []), ...testerFiles],
+      tests: testerFiles
+    };
+
+    await this.supabase.from('agent_jobs').update({
+      result: { ...(job.result || {}), code: codeWithTests }
+    }).eq('id', job.id);
+
+    return this.processNextStep(job.id, options);
+  }
+
+  private async handleSmokeTesting(job: any, options: any) {
+    await this.updateStep(job.id, 'SMOKE_TESTING');
+    await this.logEvent(job.id, 'smoke-tester', 'thought', 'Simulating user walkthrough...');
+
+    const response = await this.callAI([
+      { role: 'system', content: SMOKE_TEST_AGENT_SYSTEM_PROMPT },
+      { role: 'user', content: `Code: ${JSON.stringify(job.result.code)}` }
+    ]);
+
+    const smoke_results = parseJsonLoose(response) || { findings: [] };
+
+    await this.supabase.from('agent_jobs').update({
+      verification_results: { ...(job.verification_results || {}), smoke: smoke_results }
+    }).eq('id', job.id);
+
+    return this.processNextStep(job.id, options);
+  }
+
+  private async handleDeployment(job: any, options: any) {
+    const config = job.automation_configs;
+    if (!config || !config.enabled) {
+      await this.updateStep(job.id, 'COMPLETED');
+      await this.supabase.from('agent_jobs').update({ status: 'completed' }).eq('id', job.id);
+      return;
+    }
+
+    await this.updateStep(job.id, 'DEPLOYING');
+    await this.logEvent(job.id, 'automation', 'thought', 'Starting GitHub/Vercel deployment flow...');
+
+    if (config.github_repo_full_name && config.auto_pr) {
+      await this.automation.createPullRequest(
+        job.user_id,
+        config.github_repo_full_name,
+        `forge-job-${job.id}`,
+        job.result.code.files,
+        job.result.plan
+      );
+    }
+
+    if (config.vercel_project_id && config.auto_deploy) {
+      const deploy = await this.automation.triggerVercelDeployment(config.vercel_project_id, config.vercel_team_id);
+      await this.supabase.from('agent_jobs').update({
+        step_data: { deployment_id: deploy.deployment_id, deployment_url: deploy.url }
+      }).eq('id', job.id);
+    } else {
+      // If no auto-deploy, we're done
+      await this.updateStep(job.id, 'COMPLETED');
+      await this.supabase.from('agent_jobs').update({ status: 'completed' }).eq('id', job.id);
+    }
+  }
+
+  private async checkDeploymentStatus(job: any) {
+    const deploymentId = job.step_data?.deployment_id;
+    if (!deploymentId) return;
+
+    const status = await this.automation.trackVercelDeployment(deploymentId, job.automation_configs?.vercel_team_id);
+    if (status.status === 'READY') {
+      await this.updateStep(job.id, 'COMPLETED');
+      await this.supabase.from('agent_jobs').update({ status: 'completed' }).eq('id', job.id);
+    } else if (status.status === 'ERROR') {
+      await this.logEvent(job.id, 'automation', 'error', 'Vercel deployment failed');
+      await this.supabase.from('agent_jobs').update({ status: 'failed', error: 'Deployment failed' }).eq('id', job.id);
+    }
+  }
+
+  private async updateStep(jobId: string, step: JobStep) {
+    await this.supabase.from('agent_jobs').update({ current_step: step }).eq('id', jobId);
+  }
+
+  private async getExistingFilesContext(projectId: string): Promise<string> {
+    if (!projectId) return '';
+    const { data: files } = await this.supabase
+      .from('project_files')
+      .select('path, content')
+      .eq('project_id', projectId);
+
+    if (!files || files.length === 0) return '';
+    return `\n\nCURRENT PROJECT STATE:\n${files.map((f: any) => `File: ${f.path}\nContent:\n${f.content}`).join('\n\n---\n\n')}`;
+  }
+
+  private getCoderPrompt(job: any): string {
+    let systemPrompt = CODER_SYSTEM_PROMPT;
+    if (job.agent_type === 'refiner') {
+      systemPrompt = `
 You are the NEXUS PRIME Refinement Agent. You modify existing code based on user instructions.
 You receive the current code (JSON with files array) and a refinement request.
 
@@ -855,205 +1074,13 @@ RULES:
 4. Keep all TypeScript types, imports, and existing functionality intact.
 5. OUTPUT: Return ONLY the raw JSON string. No markdown, no explanation.
 `.trim();
-      } else {
-        // Handle Premium Agents
-        if (job.agent_type === 'marketing-psy') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${MARKETING_PSY_SYSTEM_PROMPT}`;
-        if (job.agent_type === 'security-guru') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${SECURITY_GURU_SYSTEM_PROMPT}`;
-        if (job.agent_type === 'seo-architect') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${SEO_ARCHITECT_SYSTEM_PROMPT}`;
-      }
-      
-      // Apply Custom Training Module
-      if (customSystemPrompt) {
-        systemPrompt = `${systemPrompt}\n\nCUSTOM INSTRUCTIONS:\n${customSystemPrompt}`;
-      }
-
-      if (isAgencyMode) {
-        systemPrompt = this.whiteLabelPrompt(systemPrompt, agencyConfig);
-        linterPrompt = this.whiteLabelPrompt(linterPrompt, agencyConfig);
-        testerPrompt = this.whiteLabelPrompt(testerPrompt, agencyConfig);
-      }
-
-      const coderResponse = await this.callAI([
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: job.agent_type === 'refiner' 
-            ? `Current Code Context:\n${existingFilesContext}\n\nRefinement Request: ${job.prompt}`
-            : `Plan: ${plan}${existingFilesContext}` 
-        }
-      ], isPriority ? 'deepseek-v4' : 'minimax-m2.7');
-      
-      // The Coder frequently returns a well-formed multi-file JSON object that
-      // still fails JSON.parse because the `content` values embed raw newlines
-      // / tabs instead of escaped `\n` / `\t`. parseJsonLoose tries a repair
-      // pass before we give up and collapse the whole response into a single
-      // `app/page.tsx` file.
-      const parsedCoder = parseJsonLoose<{ files?: { path: string; content: string }[] }>(coderResponse);
-      let initialCode;
-      if (parsedCoder?.files && Array.isArray(parsedCoder.files)) {
-        initialCode = parsedCoder;
-      } else {
-        initialCode = { files: [{ path: "app/page.tsx", content: coderResponse.replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*/g, '').replace(/```/g, '')).trim() }] };
-      }
-      await this.logEvent(jobId, 'coder', 'completion', `Generated ${initialCode.files?.length || 1} files`);
-
-      // Early persistence to survive Hobby timeouts
-      if (job.project_id && initialCode.files) {
-        await this.upsertProjectFiles(job.project_id, initialCode.files);
-      }
-
-      // STEP 4: LINTING - QUALITY ASSURANCE
-      await this.logEvent(jobId, 'linter', 'thought', 'Reviewing code for syntax and type safety...');
-      const linterResponse = await this.callAI([
-        { role: 'system', content: linterPrompt },
-        { role: 'user', content: `Initial Code: ${JSON.stringify(initialCode)}\nPlan: ${plan}\nContext: ${existingFilesContext}` }
-      ], isPriority ? 'glm-5' : 'kimi-k2.6');
-
-      // Same whitespace-in-string repair path as the Coder above.
-      const parsedLinter = parseJsonLoose<{ files?: { path: string; content: string }[] }>(linterResponse);
-      const finalCodeFromLinter =
-        parsedLinter?.files && Array.isArray(parsedLinter.files) ? parsedLinter : null;
-      let finalCode: { files?: { path: string; content: string }[]; tests?: { path: string; content: string }[] } =
-        finalCodeFromLinter ?? initialCode;
-      await this.logEvent(jobId, 'linter', 'completion', 'Quality assurance complete. Code is ready.');
-
-      // Persistent Linter refinements
-      if (job.project_id && finalCode.files) {
-        await this.upsertProjectFiles(job.project_id, finalCode.files);
-      }
-
-      // Update agent_jobs with partial finalCode
-      await this.supabase.from('agent_jobs').update({ 
-        result: { reasoning, plan, code: finalCode } 
-      }).eq('id', jobId);
-
-      // STEP 5: TESTING - GENERATE VITEST SUITES
-      // Non-blocking: failure here never marks the whole build failed.
-      let testerFiles = await this.runTesterAgent(jobId, finalCode, plan, testerPrompt);
-      if (testerFiles.length > 0) {
-        finalCode = {
-          ...finalCode,
-          files: [...(finalCode.files || []), ...testerFiles],
-          tests: testerFiles,
-        };
-      }
-
-      // STEP 6: EXECUTE - VALIDATE GENERATED TESTS (AST-LITE IMPORT CHECK)
-      // We don't actually `vitest run` here — a Vercel serverless function
-      // has no way to install the generated app's own deps or stand up a
-      // real test runner. Instead we do the most valuable cheap check:
-      // parse each generated test, walk its imports, and verify every
-      // imported symbol actually exists as an export in the source files.
-      // Catches the #1 Tester failure mode: "imports a symbol that doesn't
-      // exist because the Coder renamed/dropped it." Non-blocking.
-      let testResults = await this.runTestExecutor(jobId, finalCode, testerFiles);
-
-      // STEP 6.5: MOCK EXECUTION - RUN THE GENERATED TESTS
-      const mockTestResults = await this.runMockTestRunner(jobId, finalCode.files || []);
-
-      // STEP 7: RETRY ONCE IF EXECUTOR FOUND IMPORT FAILURES
-      // Bounded to 1 retry to avoid doubling build time / credit burn.
-      // The retry re-runs Coder+Linter+Tester+Executor with the previous
-      // failure messages appended to the plan so the Coder knows exactly
-      // which missing exports to add. If the retry still has failures we
-      // record them in test_results and ship the build anyway — the user
-      // at least gets the source files and a clear record of what broke.
-      const MAX_RETRIES = 1;
-      if (testResults.failed.length > 0) {
-        const retryContext = testResults.failed
-          .map((f) => `- ${f.path}: ${f.reason}`)
-          .join("\n");
-        await this.logEvent(
-          jobId,
-          "test-executor",
-          "thought",
-          `Retry 1/${MAX_RETRIES}: re-running Coder with ${testResults.failed.length} test failure(s) as context.`,
-        );
-
-        const retryPlan = `${plan}\n\nPREVIOUS BUILD FAILED TESTS:\n${retryContext}\n\nFix the missing exports so the generated tests can import them. Keep all prior files; only add or adjust what's needed.`;
-
-        try {
-          const retryCoderResponse = await this.callAI(
-            [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: `Plan: ${retryPlan}` },
-            ],
-            isPriority ? "deepseek-v4" : "minimax-m2.7",
-          );
-          const retryCoderParsed = parseJsonLoose<{ files?: { path: string; content: string }[] }>(
-            retryCoderResponse,
-          );
-          if (retryCoderParsed?.files && Array.isArray(retryCoderParsed.files)) {
-            initialCode = retryCoderParsed;
-            await this.logEvent(
-              jobId,
-              "coder",
-              "completion",
-              `Retry: regenerated ${initialCode.files?.length || 0} files`,
-            );
-
-            const retryLinterResponse = await this.callAI([
-              { role: "system", content: linterPrompt },
-              {
-                role: "user",
-                content: `Initial Code: ${JSON.stringify(initialCode)}\nPlan: ${retryPlan}`,
-              },
-            ]);
-            const retryLinterParsed = parseJsonLoose<{ files?: { path: string; content: string }[] }>(
-              retryLinterResponse,
-            );
-            finalCode =
-              retryLinterParsed?.files && Array.isArray(retryLinterParsed.files)
-                ? retryLinterParsed
-                : initialCode;
-
-            if (job.project_id && finalCode.files) {
-              await this.upsertProjectFiles(job.project_id, finalCode.files);
-            }
-
-            await this.supabase.from('agent_jobs').update({ 
-              result: { reasoning, plan, code: finalCode } 
-            }).eq('id', jobId);
-
-            testerFiles = await this.runTesterAgent(jobId, finalCode, retryPlan, testerPrompt);
-            if (testerFiles.length > 0) {
-              finalCode = {
-                ...finalCode,
-                files: [...(finalCode.files || []), ...testerFiles],
-                tests: testerFiles,
-              };
-            }
-
-            testResults = await this.runTestExecutor(jobId, finalCode, testerFiles);
-            testResults.retry_count = 1;
-          }
-        } catch (retryErr) {
-          const msg = retryErr instanceof Error ? retryErr.message : String(retryErr);
-          await this.logEvent(jobId, "test-executor", "error", `Retry failed: ${msg}`);
-        }
-      }
-
-      // STEP 8: REVIEW - FUNCTIONAL REVIEW AGAINST THE PLAN
-      // Non-blocking: reviewer failures log an event + return a
-      // fallback ReviewResults; they never mark the build failed.
-      // Uses the strongest Zen Paid model for the functional review.
-      const reviewResults = await this.runReviewerAgent(jobId, plan, finalCode, testResults);
-
-      // FINAL: COMPLETE
-      await this.supabase.from('agent_jobs').update({
-        status: 'completed',
-        result: { reasoning, plan, code: finalCode, mockTestResults },
-        test_results: testResults,
-        review_results: reviewResults,
-      }).eq('id', jobId);
-
-      // Auto-sync AI-generated code into project files (Final pass for tests/refinements)
-      if (job.project_id && finalCode?.files) {
-        await this.upsertProjectFiles(job.project_id, finalCode.files);
-      }
-
-    } catch (err: any) {
-      await this.logEvent(jobId, 'system', 'error', err.message);
-      await this.supabase.from('agent_jobs').update({ status: 'failed', error: err.message }).eq('id', jobId);
+    } else {
+      // Handle Premium Agents
+      if (job.agent_type === 'marketing-psy') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${MARKETING_PSY_SYSTEM_PROMPT}`;
+      if (job.agent_type === 'security-guru') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${SECURITY_GURU_SYSTEM_PROMPT}`;
+      if (job.agent_type === 'seo-architect') systemPrompt = `${CODER_SYSTEM_PROMPT}\n\n${SEO_ARCHITECT_SYSTEM_PROMPT}`;
     }
+    return systemPrompt;
   }
 
   /**

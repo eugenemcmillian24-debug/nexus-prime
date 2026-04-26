@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     const userId = user.id;
 
     const body = await req.json();
-    const { prompt, imageUrl, projectId, agentType, trainingModuleId } = body;
+    const { prompt, imageUrl, projectId, agentType, trainingModuleId, automationConfigId } = body;
 
     // 1. DETERMINE COST
     const { data: userCredits } = await supabase
@@ -69,7 +69,8 @@ export async function POST(req: Request) {
         image_url: imageUrl,
         project_id: projectId,
         credits_cost: totalCost,
-        training_module_id: trainingModuleId || null
+        training_module_id: trainingModuleId || null,
+        automation_config_id: automationConfigId || null
       })
       .select()
       .single();
